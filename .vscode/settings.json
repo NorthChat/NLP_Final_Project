@@ -1,0 +1,9 @@
+{
+"python.analysis.typeCheckingMode": "off",
+"python.analysis.diagnosticMode": "workspace",    
+"python.defaultInterpreterPath": "C:\\Users\\cpree\\Northeastern\\CS6120_NLP\\Project\\rag_env\\Scripts\\python.exe",
+"terminal.integrated.env.windows": {
+"CUDA_VISIBLE_DEVICES": "0"
+},
+"python.formatting.provider": "black"
+}

@@ -1,0 +1,38 @@
+# -----------------------
+# CORE DEPENDENCIES
+# -----------------------
+
+# PDF extraction
+pymupdf==1.24.2
+
+# Embeddings
+sentence-transformers==2.7.0
+
+# Vector search (FAISS CPU build for Windows)
+faiss-cpu==1.7.4
+
+# Transformers + HF ecosystem
+transformers==4.39.3
+accelerate==0.28.0
+tokenizers==0.15.2
+
+# OPTIONAL: Fix protobuf warnings for modern HF models
+protobuf==4.25.3
+
+# -----------------------
+# SERVER / UI
+# -----------------------
+gradio==4.28.3
+
+# -----------------------
+# UTILITY PACKAGES
+# -----------------------
+numpy==1.26.4
+pandas==2.2.2
+tqdm==4.66.4
+
+# -----------------------
+# EVALUATION METRICS
+# -----------------------
+rouge-score==0.1.2
+sacrebleu==2.4.0
