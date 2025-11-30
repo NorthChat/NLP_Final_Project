@@ -8,13 +8,18 @@ pymupdf==1.24.2
 # Embeddings
 sentence-transformers==2.7.0
 
-# Vector search (FAISS CPU build for Windows)
+# Vector search 
 faiss-cpu==1.7.4
+chromadb==0.4.18
 
 # Transformers + HF ecosystem
 transformers==4.39.3
 accelerate==0.28.0
 tokenizers==0.15.2
+
+# LLMs
+nltk==3.9.2
+bitsandbytes==0.41.0
 
 # OPTIONAL: Fix protobuf warnings for modern HF models
 protobuf==4.25.3
@@ -30,6 +35,9 @@ gradio==4.28.3
 numpy==1.26.4
 pandas==2.2.2
 tqdm==4.66.4
+scikit-learn==1.7.2
+matplotlib==3.10.7
+seaborn==0.12.0
 
 # -----------------------
 # EVALUATION METRICS

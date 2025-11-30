@@ -1,297 +1,230 @@
 """
-End-to-end Retrieval-Augmented Generation System (RAG)
-for summarizing and answering questions about
-Fairness & Bias research in LLMs.
+Main entry point for the RAG system
 
-Run these commands:
-
-(1) Prepare dataset (extract → chunk → embed → index)
-    python src/main.py --prepare
-
-(2) Launch the UI
-    python src/main.py
+Usage:
+    python src/main.py --prepare                    # Prepare dataset (first time)
+    python src/main.py --prepare --ablation         # Run ablation study
+    python src/main.py --ui                         # Launch UI
+    python src/main.py --evaluate                   # Run evaluation
+    python src/main.py --test                       # Quick test
 """
 
-import os
 import argparse
-import json
+import sys
 from pathlib import Path
-from tqdm import tqdm
-from numpy.typing import NDArray
-import numpy as np
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from prepare_data import prepare_dataset
+from ui import launch_ui
+from evaluation import run_full_evaluation
+from retrieval import test_retrieval
+from generation import test_generation
+from config import *
 
 
-# PDF extraction
-import fitz  # PyMuPDF
-
-# Embeddings
-from sentence_transformers import SentenceTransformer
-
-# FAISS index
-import faiss
-
-# Generation
-from transformers import (
-    AutoTokenizer,
-    AutoModelForSeq2SeqLM,
-    pipeline
-)
-
-# UI
-import gradio as gr
-
-# -----------------------
-# CONFIG
-# -----------------------
-
-ROOT = Path(__file__).resolve().parent.parent
-
-PDF_DIR = ROOT / "papers_pdf"
-DATA_DIR = ROOT / "data"
-INDEX_DIR = ROOT / "index"
-
-CHUNKS_FILE = DATA_DIR / "chunks.jsonl"
-METAS_FILE = DATA_DIR / "metas.jsonl"
-EMBS_FILE = DATA_DIR / "embeddings.npy"
-INDEX_FILE = INDEX_DIR / "faiss_index.idx"
-
-EMBED_MODEL = "all-MiniLM-L6-v2"
-GEN_MODEL = "google/flan-t5-large"
-
-CHUNK_SIZE = 450
-CHUNK_OVERLAP = 100
-TOP_K = 5
-BATCH = 32
-
-
-# -----------------------
-# UTILITIES
-# -----------------------
-
-def cuda_available():
-    try:
-        import torch
-        return torch.cuda.is_available()
-    except:
-        return False
-
-
-def pdf_to_text(pdf_path: Path) -> str:
-    """Extract all text from a PDF using PyMuPDF."""
-    doc = fitz.open(pdf_path)
-    pages = [page.get_text("text") for page in doc] # type: ignore[attr-defined]
-    return "\n".join(pages)
-
-
-def chunk_text(text: str, chunk_size=450, overlap=100):
-    """Chunk long text using word-based sliding window."""
-    words = text.split()
-    chunks = []
-    i = 0
-    while i < len(words):
-        chunk = " ".join(words[i:i + chunk_size])
-        chunks.append(chunk)
-        i += chunk_size - overlap
-    return chunks
-
-
-# -----------------------
-# PREPARE DATA
-# -----------------------
-
-def prepare():
-    DATA_DIR.mkdir(exist_ok=True)
-    INDEX_DIR.mkdir(exist_ok=True)
-
-    all_chunks = []
-    all_metas = []
-
-    pdf_paths = sorted(PDF_DIR.glob("*.pdf"))
-
-    print(f"\n[INFO] Found {len(pdf_paths)} PDFs.\n")
-
-    # -----------------------
-    # 1. PDF → Text → Chunks
-    # -----------------------
-    for pdf in pdf_paths:
-        paper_id = pdf.stem
-        print(f"[+] Processing {pdf.name}")
-
-        text = pdf_to_text(pdf)
-
-        if len(text.strip()) < 20:
-            print(f"[WARNING] PDF might be scanned or empty: {pdf}")
-            continue
-
-        chunks = chunk_text(text, CHUNK_SIZE, CHUNK_OVERLAP)
-
-        for idx, chunk in enumerate(chunks):
-            chunk_id = f"{paper_id}_chunk{idx}"
-            all_chunks.append({
-                "paper_id": paper_id,
-                "chunk_id": chunk_id,
-                "text": chunk
-            })
-            all_metas.append({
-                "paper_id": paper_id,
-                "chunk_id": chunk_id
-            })
-
-    # Save chunks
-    with open(CHUNKS_FILE, "w", encoding="utf-8") as f:
-        for obj in all_chunks:
-            f.write(json.dumps(obj) + "\n")
-
-    with open(METAS_FILE, "w", encoding="utf-8") as f:
-        for m in all_metas:
-            f.write(json.dumps(m) + "\n")
-
-    print(f"[INFO] Saved {len(all_chunks)} chunks.")
-
-    # -----------------------
-    # 2. Embeddings
-    # -----------------------
-
-    device = "cuda" if cuda_available() else "cpu"
-    print(f"[INFO] Embedding on device: {device}")
-
-    embedder = SentenceTransformer(EMBED_MODEL, device=device)
-
-    raw_chunks = [c["text"] for c in all_chunks]
-
-    print("\n[INFO] Generating embeddings...")
-    embeddings: NDArray[np.float32] = embedder.encode(
-        raw_chunks,
-        batch_size=BATCH,
-        show_progress_bar=True,
-        convert_to_numpy=True
-    ).astype("float32")  # type: ignore
-
-    np.save(EMBS_FILE, embeddings)
-
-    # -----------------------
-    # 3. FAISS Index
-    # -----------------------
-    print("\n[INFO] Building FAISS index...")
-
-    faiss.normalize_L2(embeddings)
-    dim = embeddings.shape[1]
-
-    index = faiss.IndexFlatIP(dim)
-    index.add(embeddings)  # type: ignore
-
-    faiss.write_index(index, str(INDEX_FILE))
-
-    print(f"\n[✓] PREPARATION DONE.")
-    print(f"    Chunks:     {len(all_chunks)}")
-    print(f"    Embeddings: {EMBS_FILE}")
-    print(f"    Index:      {INDEX_FILE}\n")
+def run_ablation_study():
+    """
+    Run ablation study comparing different configurations
+    Required for A grade
+    """
+    print("\n" + "="*80)
+    print("RUNNING ABLATION STUDY")
+    print("="*80 + "\n")
+    
+    from retrieval import Retriever
+    from generation import Generator
+    from evaluation import RAGEvaluator
+    
+    evaluator = RAGEvaluator()
+    
+    # Load Q/A pairs
+    qa_pairs = evaluator.load_qa_pairs()
+    print(f"[INFO] Loaded {len(qa_pairs)} Q/A pairs for ablation study\n")
+    
+    # Configurations to compare
+    configs = [
+        {"embed": "minilm", "chunk_size": 250, "name": "MiniLM-250"},
+        {"embed": "minilm", "chunk_size": 450, "name": "MiniLM-450"},
+        {"embed": "bge", "chunk_size": 250, "name": "BGE-250"},
+        {"embed": "bge", "chunk_size": 450, "name": "BGE-450"},
+    ]
+    
+    results = {}
+    
+    for config in configs:
+        print(f"\n{'='*60}")
+        print(f"Testing: {config['name']}")
+        print(f"{'='*60}\n")
+        
+        # Prepare data with this config
+        embed_model = EMBED_MODELS[config['embed']]
+        
+        print(f"[1] Preparing data with {embed_model}, chunk_size={config['chunk_size']}...")
+        prepare_dataset(
+            embed_model=embed_model,
+            chunk_size=config['chunk_size']
+        )
+        
+        # Evaluate
+        print(f"\n[2] Evaluating {config['name']}...")
+        retriever = Retriever(embed_model=embed_model)
+        generator = Generator()
+        
+        # Retrieval evaluation
+        retrieval_metrics = evaluator.evaluate_retrieval(
+            qa_pairs, retriever, k_values=[5]
+        )
+        
+        # Generation evaluation (sample)
+        sample_qa = qa_pairs[:10]  # Sample for speed
+        retrieval_results = [retriever.retrieve(qa["question"], top_k=5) for qa in sample_qa]
+        generated = [generator.generate(qa["question"], retr)["answer"] 
+                    for qa, retr in zip(sample_qa, retrieval_results)]
+        
+        generation_metrics = evaluator.evaluate_generation(sample_qa, generated)
+        
+        # Store results
+        results[config['name']] = {
+            "retrieval": retrieval_metrics[5],
+            "generation": generation_metrics
+        }
+        
+        print(f"\n{config['name']} Results:")
+        print(f"  Precision@5: {retrieval_metrics[5]['precision@k']:.3f}")
+        print(f"  Recall@5: {retrieval_metrics[5]['recall@k']:.3f}")
+        print(f"  ROUGE-L: {generation_metrics['rougeL']:.3f}")
+    
+    # Save ablation results
+    import json
+    ablation_file = EVAL_DIR / "ablation_study.json"
+    with open(ablation_file, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\n{'='*80}")
+    print("ABLATION STUDY COMPLETE")
+    print(f"Results saved to: {ablation_file}")
+    print("="*80 + "\n")
+    
+    # Create comparison visualization
+    import matplotlib.pyplot as plt
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    
+    names = list(results.keys())
+    precision = [results[n]['retrieval']['precision@k'] for n in names]
+    recall = [results[n]['retrieval']['recall@k'] for n in names]
+    rouge = [results[n]['generation']['rougeL'] for n in names]
+    
+    # Retrieval comparison
+    x = range(len(names))
+    width = 0.35
+    axes[0].bar([i - width/2 for i in x], precision, width, label='Precision@5', alpha=0.8)
+    axes[0].bar([i + width/2 for i in x], recall, width, label='Recall@5', alpha=0.8)
+    axes[0].set_xlabel('Configuration')
+    axes[0].set_ylabel('Score')
+    axes[0].set_title('Retrieval Performance Comparison')
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(names, rotation=45, ha='right')
+    axes[0].legend()
+    axes[0].grid(True, alpha=0.3, axis='y')
+    
+    # Generation comparison
+    axes[1].bar(names, rouge, color='green', alpha=0.7)
+    axes[1].set_xlabel('Configuration')
+    axes[1].set_ylabel('ROUGE-L Score')
+    axes[1].set_title('Generation Performance Comparison')
+    axes[1].set_xticklabels(names, rotation=45, ha='right')
+    axes[1].grid(True, alpha=0.3, axis='y')
+    
+    plt.tight_layout()
+    viz_file = EVAL_DIR / "ablation_comparison.png"
+    plt.savefig(viz_file, dpi=300, bbox_inches='tight')
+    print(f"[INFO] Ablation visualization saved to: {viz_file}\n")
 
 
-# -----------------------
-# RETRIEVAL
-# -----------------------
-
-def load_index_and_data():
-    index = faiss.read_index(str(INDEX_FILE))
-    texts = [json.loads(line)["text"] for line in open(CHUNKS_FILE, "r", encoding="utf-8")]
-    metas = [json.loads(line) for line in open(METAS_FILE, "r", encoding="utf-8")]
-    return index, metas, texts
-
-
-def retrieve(query, index, embedder, metas, texts, top_k=TOP_K):
-    q_emb = embedder.encode(query, convert_to_numpy=True).astype("float32").reshape(1, -1)
-    faiss.normalize_L2(q_emb)
-
-    scores, indices = index.search(q_emb, top_k)
-
-    results = []
-    for score, idx in zip(scores[0], indices[0]):
-        results.append({
-            "score": float(score),
-            "meta": metas[idx],
-            "text": texts[idx]
-        })
-    return results
+def quick_test():
+    """Quick end-to-end test"""
+    print("\n" + "="*60)
+    print("RUNNING QUICK TEST")
+    print("="*60 + "\n")
+    
+    print("[1/2] Testing retrieval...")
+    test_retrieval()
+    
+    print("\n[2/2] Testing generation...")
+    test_generation()
+    
+    print("\n" + "="*60)
+    print("TEST COMPLETE!")
+    print("="*60 + "\n")
 
 
-# -----------------------
-# GENERATION
-# -----------------------
-
-def load_generator():
-    device = 0 if cuda_available() else -1
-    tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL)
-    model = AutoModelForSeq2SeqLM.from_pretrained(GEN_MODEL)
-    pipe = pipeline(
-        "text2text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        device=device
+def main():
+    parser = argparse.ArgumentParser(
+        description="RAG System for Fairness & Bias in LLMs"
     )
-    return pipe
-
-
-def generate_answer(generator, retrieved, question):
-    context = "\n\n".join([r["text"] for r in retrieved])
-    prompt = f"""
-Answer ONLY using the context below.
-
-CONTEXT:
-{context}
-
-QUESTION:
-{question}
-
-ANSWER:
-"""
-
-    out = generator(prompt, max_length=300, do_sample=False)[0]["generated_text"]
-    return out
-
-
-# -----------------------
-# UI
-# -----------------------
-
-def launch_ui():
-    index, metas, texts = load_index_and_data()
-    embedder = SentenceTransformer(EMBED_MODEL, device="cuda" if cuda_available() else "cpu")
-    generator = load_generator()
-
-    def qa_fn(query, top_k):
-        retrieved = retrieve(query, index, embedder, metas, texts, top_k)
-        answer = generate_answer(generator, retrieved, query)
-        cites = "\n".join([f"{r['meta']['paper_id']} (score {r['score']:.3f})" for r in retrieved])
-        return answer, cites
-
-    ui = gr.Interface(
-        fn=qa_fn,
-        inputs=[
-            gr.Textbox(label="Enter your research question"),
-            gr.Slider(1, 10, value=5, step=1, label="Top-K")
-        ],
-        outputs=[
-            gr.Textbox(label="Answer"),
-            gr.Textbox(label="Retrieved Chunks")
-        ],
-        title="Fairness & Bias in LLMs — RAG System",
-        description="Ask any research question about fairness or bias in LLMs."
+    
+    parser.add_argument(
+        "--prepare",
+        action="store_true",
+        help="Prepare dataset (PDF → chunks → embeddings → index)"
     )
+    
+    parser.add_argument(
+        "--ablation",
+        action="store_true",
+        help="Run ablation study (use with --prepare)"
+    )
+    
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch Gradio UI"
+    )
+    
+    parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Run full evaluation"
+    )
+    
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run quick test"
+    )
+    
+    parser.add_argument(
+        "--share",
+        action="store_true",
+        help="Create public share link for UI"
+    )
+    
+    args = parser.parse_args()
+    
+    # If no args, show help
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
+    
+    # Execute commands
+    if args.prepare:
+        if args.ablation:
+            run_ablation_study()
+        else:
+            prepare_dataset()
+    
+    if args.test:
+        quick_test()
+    
+    if args.evaluate:
+        run_full_evaluation()
+    
+    if args.ui:
+        launch_ui(share=args.share)
 
-    ui.launch(server_name="0.0.0.0", server_port=7860)
-
-
-# -----------------------
-# MAIN
-# -----------------------
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--prepare", action="store_true")
-    args = parser.parse_args()
-
-    if args.prepare:
-        prepare()
-    else:
-        launch_ui()
+    main()
