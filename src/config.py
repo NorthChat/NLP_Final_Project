@@ -31,12 +31,16 @@ GEN_MODELS = {
 # Hyperparameters
 CHUNK_SIZES = [250, 450]  # For ablation study
 CHUNK_OVERLAP = 100
-TOP_K = 5
+TOP_K = 3
 BATCH_SIZE = 32
 MAX_GEN_LENGTH = 300
+
+# Model constraints
+MAX_INPUT_TOKENS = 512  # FLAN-T5 limit
+MAX_CONTEXT_TOKENS = 400  # Reserve space for question and prompt template
 
 # Evaluation
 EVAL_METRICS = ["precision", "recall", "mrr", "rouge", "human"]
 
 # Device settings
-DEVICE = "cuda"  # Your RTX 4060 will be utilized
+DEVICE = "cuda"  # Laptop GPU will be utilized

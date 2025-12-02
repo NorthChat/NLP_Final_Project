@@ -96,8 +96,8 @@ class RAGUI:
                     with gr.Row():
                         top_k_slider = gr.Slider(
                             minimum=1,
-                            maximum=6,
-                            value=3,
+                            maximum=10,
+                            value=5,
                             step=1,
                             label="Number of chunks to retrieve (Top-K)"
                         )

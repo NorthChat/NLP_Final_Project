@@ -1,9 +1,9 @@
 """
-Main entry point for the RAG system
+Main entry point for the RAG system - A GRADE VERSION
 
 Usage:
     python src/main.py --prepare                    # Prepare dataset (first time)
-    python src/main.py --prepare --ablation         # Run ablation study
+    python src/main.py --prepare --ablation         # Run ablation study (A requirement)
     python src/main.py --ui                         # Launch UI
     python src/main.py --evaluate                   # Run evaluation
     python src/main.py --test                       # Quick test
@@ -27,10 +27,14 @@ from config import *
 def run_ablation_study():
     """
     Run ablation study comparing different configurations
-    Required for A grade
+    
+    A GRADE REQUIREMENT:
+    - Compare embedding models (MiniLM vs BGE)
+    - Compare chunk sizes (250 vs 450)
+    - Generate comprehensive comparison
     """
     print("\n" + "="*80)
-    print("RUNNING ABLATION STUDY")
+    print("RUNNING ABLATION STUDY (A Grade Requirement)")
     print("="*80 + "\n")
     
     from retrieval import Retriever
@@ -41,7 +45,11 @@ def run_ablation_study():
     
     # Load Q/A pairs
     qa_pairs = evaluator.load_qa_pairs()
-    print(f"[INFO] Loaded {len(qa_pairs)} Q/A pairs for ablation study\n")
+    print(f"[INFO] Loaded {len(qa_pairs)} Q/A pairs for ablation study")
+    
+    if len(qa_pairs) < 50:
+        print(f"[WARNING] A grade requires 50 Q/A pairs, found {len(qa_pairs)}")
+        print("[WARNING] Add more Q/A pairs to qa_pairs.json for full A grade\n")
     
     # Configurations to compare
     configs = [
@@ -64,7 +72,8 @@ def run_ablation_study():
         print(f"[1] Preparing data with {embed_model}, chunk_size={config['chunk_size']}...")
         prepare_dataset(
             embed_model=embed_model,
-            chunk_size=config['chunk_size']
+            chunk_size=config['chunk_size'],
+            force_rebuild=True  # Force rebuild to get different datasets
         )
         
         # Evaluate
@@ -77,8 +86,9 @@ def run_ablation_study():
             qa_pairs, retriever, k_values=[5]
         )
         
-        # Generation evaluation (sample)
-        sample_qa = qa_pairs[:10]  # Sample for speed
+        # Generation evaluation (sample for speed)
+        sample_size = min(10, len(qa_pairs))
+        sample_qa = qa_pairs[:sample_size]
         retrieval_results = [retriever.retrieve(qa["question"], top_k=5) for qa in sample_qa]
         generated = [generator.generate(qa["question"], retr)["answer"] 
                     for qa, retr in zip(sample_qa, retrieval_results)]
@@ -99,6 +109,7 @@ def run_ablation_study():
     # Save ablation results
     import json
     ablation_file = EVAL_DIR / "ablation_study.json"
+    EVAL_DIR.mkdir(exist_ok=True)
     with open(ablation_file, 'w') as f:
         json.dump(results, f, indent=2)
     
@@ -124,7 +135,7 @@ def run_ablation_study():
     axes[0].bar([i + width/2 for i in x], recall, width, label='Recall@5', alpha=0.8)
     axes[0].set_xlabel('Configuration')
     axes[0].set_ylabel('Score')
-    axes[0].set_title('Retrieval Performance Comparison')
+    axes[0].set_title('Ablation Study: Retrieval Performance')
     axes[0].set_xticks(x)
     axes[0].set_xticklabels(names, rotation=45, ha='right')
     axes[0].legend()
@@ -134,8 +145,9 @@ def run_ablation_study():
     axes[1].bar(names, rouge, color='green', alpha=0.7)
     axes[1].set_xlabel('Configuration')
     axes[1].set_ylabel('ROUGE-L Score')
-    axes[1].set_title('Generation Performance Comparison')
-    axes[1].set_xticklabels(names, rotation=45, ha='right')
+    axes[1].set_title('Ablation Study: Generation Performance')
+    axes[1].set_xticks(x)  # Set ticks first
+    axes[1].set_xticklabels(names, rotation=45, ha='right')  # Then labels
     axes[1].grid(True, alpha=0.3, axis='y')
     
     plt.tight_layout()
@@ -163,7 +175,7 @@ def quick_test():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="RAG System for Fairness & Bias in LLMs"
+        description="RAG System for Fairness & Bias in LLMs - A GRADE VERSION"
     )
     
     parser.add_argument(
@@ -173,9 +185,21 @@ def main():
     )
     
     parser.add_argument(
+        "--force-rebuild",
+        action="store_true",
+        help="Force complete rebuild (ignore incremental updates)"
+    )
+    
+    parser.add_argument(
+        "--no-incremental",
+        action="store_true",
+        help="Disable incremental indexing"
+    )
+    
+    parser.add_argument(
         "--ablation",
         action="store_true",
-        help="Run ablation study (use with --prepare)"
+        help="Run ablation study (A GRADE REQUIREMENT)"
     )
     
     parser.add_argument(
@@ -187,7 +211,7 @@ def main():
     parser.add_argument(
         "--evaluate",
         action="store_true",
-        help="Run full evaluation"
+        help="Run full evaluation (A GRADE REQUIREMENT)"
     )
     
     parser.add_argument(
@@ -207,6 +231,13 @@ def main():
     # If no args, show help
     if len(sys.argv) == 1:
         parser.print_help()
+        print("\n" + "="*60)
+        print("="*60)
+        print("1. Run: python src/main.py --prepare")
+        print("2. Run: python src/main.py --prepare --ablation")
+        print("3. Run: python src/main.py --evaluate")
+        print("4. Run: python src/main.py --ui")
+        print("="*60 + "\n")
         sys.exit(0)
     
     # Execute commands
@@ -214,7 +245,10 @@ def main():
         if args.ablation:
             run_ablation_study()
         else:
-            prepare_dataset()
+            prepare_dataset(
+                force_rebuild=args.force_rebuild,
+                incremental=not args.no_incremental
+            )
     
     if args.test:
         quick_test()

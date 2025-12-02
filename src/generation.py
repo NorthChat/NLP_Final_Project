@@ -95,20 +95,37 @@ class Generator:
         # Create prompt
         prompt = self._build_prompt(question, context)
         
+        # CRITICAL: Check token count and truncate if needed
+        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=False)
+        input_length = inputs['input_ids'].shape[1]
+        
+        # FLAN-T5 max length is 512 tokens
+        max_input_tokens = 512
+        
+        if input_length > max_input_tokens:
+            # Silently truncate context (no warning spam)
+            prompt = self._build_prompt_with_truncation(question, context, max_input_tokens)
+        
         # Generate
-        output = self.pipe(
-            prompt,
-            max_length=max_length,
-            do_sample=False,  # Deterministic generation
-            num_beams=4,  # Beam search for better quality
-            early_stopping=True
-        )
-        
-        # Extract generated text
-        generated_text = output[0]["generated_text"]  # type: ignore[index]
-        
-        # Clean output
-        answer = str(generated_text).strip()
+        try:
+            output = self.pipe(
+                prompt,
+                max_new_tokens=max_length,  # Use max_new_tokens instead of max_length
+                do_sample=False,  # Deterministic generation
+                num_beams=4,  # Beam search for better quality
+                early_stopping=True,
+                truncation=True  # Enable truncation as safety
+            )
+            
+            # Extract generated text
+            generated_text = output[0]["generated_text"]  # type: ignore[index]
+            
+            # Clean output
+            answer = str(generated_text).strip()
+            
+        except Exception as e:
+            print(f"[ERROR] Generation failed: {e}")
+            answer = "Error: Context too long. Please reduce Top-K or try a shorter query."
         
         return {
             "answer": answer,
@@ -131,6 +148,47 @@ Question: {question}
 Based on the context above, provide a detailed and accurate answer. Use information directly from the context.
 
 Answer:"""
+        return prompt
+    
+    def _build_prompt_with_truncation(self, question: str, context: str, max_tokens: int) -> str:
+        """
+        Build prompt with truncated context to fit token limit
+        
+        Args:
+            question: User question
+            context: Full context (may be too long)
+            max_tokens: Maximum tokens allowed (512 for FLAN-T5)
+        
+        Returns:
+            Truncated prompt that fits within max_tokens
+        """
+        # Reserve tokens for prompt template and question
+        template_overhead = 50  # "Context:", "Question:", "Answer:", etc.
+        question_tokens = len(self.tokenizer.encode(question))
+        available_for_context = max_tokens - template_overhead - question_tokens - 50  # Safety margin
+        
+        # Tokenize context and truncate
+        context_tokens = self.tokenizer.encode(context, truncation=False)
+        
+        if len(context_tokens) > available_for_context:
+            # Truncate context tokens
+            truncated_tokens = context_tokens[:available_for_context]
+            truncated_context = self.tokenizer.decode(truncated_tokens, skip_special_tokens=True)
+            # Only print in verbose mode
+            # print(f"[INFO] Context truncated from {len(context_tokens)} to {available_for_context} tokens")
+        else:
+            truncated_context = context
+        
+        # Build prompt with truncated context
+        prompt = f"""Context:
+{truncated_context}
+
+Question: {question}
+
+Based on the context above, provide a detailed and accurate answer.
+
+Answer:"""
+        
         return prompt
     
     def batch_generate(
