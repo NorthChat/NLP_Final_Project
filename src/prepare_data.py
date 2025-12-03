@@ -104,7 +104,7 @@ def pdf_to_text(pdf_path: Path) -> str:
 # CHUNKING STRATEGIES
 # ===========================
 
-def chunk_text(text: str, chunk_size: int = 450, overlap: int = 100) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 250, overlap: int = 100) -> List[str]:
     """
     Chunk text using sliding window on words.
     
@@ -333,8 +333,8 @@ def load_existing_data() -> Tuple[List[Dict], List[Dict], NDArray[np.float32] | 
 
 def prepare_dataset(
     embed_model: str = EMBED_MODELS["minilm"],
-    chunk_size: int = 450,
-    use_sentence_chunking: bool = True,
+    chunk_size: int = 250,
+    use_sentence_chunking: bool = False,
     force_rebuild: bool = False,
     incremental: bool = True
 ):

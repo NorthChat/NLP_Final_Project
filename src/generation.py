@@ -1,11 +1,12 @@
 """
 Generation module: Generate answers using retrieved context
 """
-from typing import List, Dict
+from typing import List, Dict, Any
 import torch
 from transformers import (
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
+    Pipeline,
     pipeline
 )
 
@@ -51,7 +52,7 @@ class Generator:
                 model_name,
                 torch_dtype=torch.float32
             )
-            self.pipe = pipeline(
+            self.Pipeline = pipeline(
                 "text2text-generation",
                 model=self.model,
                 tokenizer=self.tokenizer,
@@ -59,13 +60,84 @@ class Generator:
             )
             print(f"[Generator] Model loaded on CPU")
     
+
+    def _estimate_tokens(self, text: str) -> int:
+        """
+        Estimate token count for text
+        
+        Args:
+            text: Input text
+        
+        Returns:
+            Estimated token count
+        """
+        return len(self.tokenizer.encode(text, add_special_tokens=False))
+    
+    def _select_best_chunks(
+        self, 
+        chunks: List[Dict[str, Any]], 
+        question: str,
+        max_context_tokens: int = 400
+    ) -> List[Dict[str, Any]]:
+        """
+        Intelligently select chunks that fit within token budget
+        
+        Prioritizes:
+        1. Highest scoring chunks (most relevant)
+        2. Diversity (different papers)
+        3. Token budget compliance
+        
+        Args:
+            chunks: List of retrieved chunks with scores
+            question: User question (for token budget calculation)
+            max_context_tokens: Maximum tokens for context
+        
+        Returns:
+            Selected chunks that fit within budget
+        """
+        # Calculate tokens for question and template
+        template_tokens = 50  # Approximate for "Context:", "Question:", etc.
+        question_tokens = self._estimate_tokens(question)
+        available_tokens = max_context_tokens - template_tokens - question_tokens
+        
+        # Sort by score (already sorted, but ensure)
+        sorted_chunks = sorted(chunks, key=lambda x: x['score'], reverse=True)
+        
+        selected = []
+        used_tokens = 0
+        seen_papers = set()
+        
+        for chunk in sorted_chunks:
+            chunk_tokens = self._estimate_tokens(chunk['text'])
+            
+            # Check if adding this chunk would exceed budget
+            if used_tokens + chunk_tokens > available_tokens:
+                # Try to fit a smaller portion of the chunk
+                if len(selected) == 0:
+                    # Must include at least one chunk
+                    # Truncate this chunk to fit
+                    selected.append(chunk)
+                break
+            
+            # Add chunk
+            selected.append(chunk)
+            used_tokens += chunk_tokens
+            seen_papers.add(chunk['meta']['paper_id'])
+            
+            # Stop if we have good coverage (3-4 chunks or 2+ papers)
+            if len(selected) >= 3 and len(seen_papers) >= 2:
+                break
+        
+        return selected
+
     def generate(
         self,
         question: str,
-        retrieved_chunks: List[Dict],
+        retrieved_chunks: List[Dict[str, Any]],
         max_length: int = MAX_GEN_LENGTH,
-        include_citations: bool = True
-    ) -> Dict:
+        include_citations: bool = True,
+        smart_selection: bool = True
+    ) -> Dict[str, Any]:
         """
         Generate answer from retrieved context
         
@@ -74,15 +146,27 @@ class Generator:
             retrieved_chunks: List of retrieved chunks from Retriever
             max_length: Maximum generation length
             include_citations: Whether to include source citations
+            smart_selection: Whether to use intelligent chunk selection
         
         Returns:
-            Dict with 'answer', 'sources', 'prompt'
+            Dict with 'answer', 'sources', 'prompt', 'chunks_used'
         """
+
+        # Smart chunk selection to fit token budget
+        if smart_selection:
+            selected_chunks = self._select_best_chunks(
+                retrieved_chunks, 
+                question,
+                max_context_tokens=400
+            )
+        else:
+            selected_chunks = retrieved_chunks
+        
         # Build context from retrieved chunks
         context_parts = []
         sources = []
         
-        for i, chunk in enumerate(retrieved_chunks, 1):
+        for i, chunk in enumerate(selected_chunks, 1):
             context_parts.append(f"[{i}] {chunk['text']}")
             sources.append({
                 "rank": chunk["rank"],
@@ -103,23 +187,25 @@ class Generator:
         max_input_tokens = 512
         
         if input_length > max_input_tokens:
-            # Silently truncate context (no warning spam)
+            # Emergency truncation (should rarely happen with smart selection)
             prompt = self._build_prompt_with_truncation(question, context, max_input_tokens)
         
         # Generate
         try:
             output = self.pipe(
                 prompt,
-                max_new_tokens=max_length,  # Use max_new_tokens instead of max_length
+                max_new_tokens=max_length,
                 do_sample=False,  # Deterministic generation
                 num_beams=4,  # Beam search for better quality
                 early_stopping=True,
                 truncation=True  # Enable truncation as safety
             )
             
-            # Extract generated text
-            generated_text = output[0]["generated_text"]  # type: ignore[index]
-            
+            # Extract generated text safely
+            if isinstance(output, list) and len(output) > 0:
+                generated_text = output[0].get("generated_text", "")
+            else:
+                generated_text = ""
             # Clean output
             answer = str(generated_text).strip()
             
@@ -131,7 +217,9 @@ class Generator:
             "answer": answer,
             "sources": sources if include_citations else [],
             "prompt": prompt,
-            "question": question
+            "question": question,
+            "chunks_used": len(selected_chunks),
+            "chunks_available": len(retrieved_chunks)
         }
     
     def _build_prompt(self, question: str, context: str) -> str:
@@ -140,19 +228,31 @@ class Generator:
         
         Template optimized for FLAN-T5
         """
-        prompt = f"""Context:
+        prompt = f"""You are an expert on fairness and bias in large language models. 
+Answer the question using SPECIFIC, CONCRETE information from the research papers below.
+The answer should be DETAILED and TECHNICAL.
+It should not be vague or general.
+
+IMPORTANT: 
+- Include EXACT NAMES (e.g., "demographic parity", "WinoBias dataset")
+- Provide SPECIFIC FINDINGS from the papers
+- DO NOT make vague or general statements
+- Use terminology from the context
+
+Research Papers:
 {context}
 
 Question: {question}
 
-Based on the context above, provide a detailed and accurate answer. Use information directly from the context.
-
-Answer:"""
+Detailed answer with specific information from the papers:
+"""
         return prompt
     
     def _build_prompt_with_truncation(self, question: str, context: str, max_tokens: int) -> str:
         """
         Build prompt with truncated context to fit token limit
+        
+        This is a fallback for edge cases where smart selection isn't enough.
         
         Args:
             question: User question
@@ -194,9 +294,9 @@ Answer:"""
     def batch_generate(
         self,
         questions: List[str],
-        retrieved_results: List[List[Dict]],
-        **kwargs
-    ) -> List[Dict]:
+        retrieved_results: List[List[Dict[str, Any]]],
+        **kwargs: Any
+    ) -> List[Dict[str, Any]]:
         """
         Generate answers for multiple questions (for evaluation)
         
@@ -213,9 +313,37 @@ Answer:"""
             result = self.generate(question, chunks, **kwargs)
             results.append(result)
         return results
+    
+    def get_context_stats(self, question: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Get statistics about context size and token usage
+        
+        Useful for debugging and optimization
+        
+        Args:
+            question: User question
+            chunks: Retrieved chunks
+        
+        Returns:
+            Dict with token statistics
+        """
+        selected = self._select_best_chunks(chunks, question)
+        
+        total_tokens = 0
+        for chunk in selected:
+            total_tokens += self._estimate_tokens(chunk['text'])
+        
+        return {
+            "question_tokens": self._estimate_tokens(question),
+            "context_tokens": total_tokens,
+            "chunks_selected": len(selected),
+            "chunks_available": len(chunks),
+            "within_budget": total_tokens < 400,
+            "estimated_total": self._estimate_tokens(question) + total_tokens + 50
+        }
 
 
-def test_generation():
+def test_generation() -> None:
     """Test generation with sample query"""
     from retrieval import Retriever
     
@@ -238,16 +366,26 @@ def test_generation():
     
     print(f"Retrieved {len(chunks)} chunks\n")
     
+    # Check context stats
+    stats = generator.get_context_stats(question, chunks)
+    print("Context Statistics:")
+    print(f"  Question tokens: {stats['question_tokens']}")
+    print(f"  Context tokens: {stats['context_tokens']}")
+    print(f"  Chunks selected: {stats['chunks_selected']}/{stats['chunks_available']}")
+    print(f"  Within budget: {stats['within_budget']}")
+    print(f"  Estimated total: {stats['estimated_total']}/512")
+    print()
+
     # Generate
     print("Generating answer...")
     result = generator.generate(question, chunks)
     
     print(f"\nAnswer:\n{result['answer']}\n")
     
-    print("Sources:")
+    print(f"Chunks used: {result['chunks_used']}/{result['chunks_available']}")
+    print("\nSources:")
     for src in result['sources']:
         print(f"  [{src['rank']}] {src['paper_id']} (score: {src['score']:.3f})")
-
 
 if __name__ == "__main__":
     test_generation()

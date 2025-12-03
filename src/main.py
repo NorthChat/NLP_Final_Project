@@ -28,13 +28,12 @@ def run_ablation_study():
     """
     Run ablation study comparing different configurations
     
-    A GRADE REQUIREMENT:
     - Compare embedding models (MiniLM vs BGE)
     - Compare chunk sizes (250 vs 450)
     - Generate comprehensive comparison
     """
     print("\n" + "="*80)
-    print("RUNNING ABLATION STUDY (A Grade Requirement)")
+    print("RUNNING ABLATION STUDY")
     print("="*80 + "\n")
     
     from retrieval import Retriever
@@ -47,16 +46,12 @@ def run_ablation_study():
     qa_pairs = evaluator.load_qa_pairs()
     print(f"[INFO] Loaded {len(qa_pairs)} Q/A pairs for ablation study")
     
-    if len(qa_pairs) < 50:
-        print(f"[WARNING] A grade requires 50 Q/A pairs, found {len(qa_pairs)}")
-        print("[WARNING] Add more Q/A pairs to qa_pairs.json for full A grade\n")
-    
     # Configurations to compare
     configs = [
-        {"embed": "minilm", "chunk_size": 250, "name": "MiniLM-250"},
-        {"embed": "minilm", "chunk_size": 450, "name": "MiniLM-450"},
         {"embed": "bge", "chunk_size": 250, "name": "BGE-250"},
         {"embed": "bge", "chunk_size": 450, "name": "BGE-450"},
+        {"embed": "minilm", "chunk_size": 250, "name": "MiniLM-250"},
+        {"embed": "minilm", "chunk_size": 450, "name": "MiniLM-450"},
     ]
     
     results = {}
@@ -73,7 +68,8 @@ def run_ablation_study():
         prepare_dataset(
             embed_model=embed_model,
             chunk_size=config['chunk_size'],
-            force_rebuild=True  # Force rebuild to get different datasets
+            force_rebuild=True,  # Force rebuild to get different datasets
+            use_sentence_chunking=True
         )
         
         # Evaluate
@@ -199,7 +195,7 @@ def main():
     parser.add_argument(
         "--ablation",
         action="store_true",
-        help="Run ablation study (A GRADE REQUIREMENT)"
+        help="Run ablation study"
     )
     
     parser.add_argument(
@@ -211,7 +207,7 @@ def main():
     parser.add_argument(
         "--evaluate",
         action="store_true",
-        help="Run full evaluation (A GRADE REQUIREMENT)"
+        help="Run full evaluation"
     )
     
     parser.add_argument(

@@ -20,7 +20,10 @@ QA_PAIRS_FILE = ROOT / "qa_pairs.json"
 # Model configurations
 EMBED_MODELS = {
     "minilm": "all-MiniLM-L6-v2",
-    "bge": "BAAI/bge-small-en-v1.5"
+    "bge": "BAAI/bge-small-en-v1.5",
+    "bge-base": "BAAI/bge-base-en-v1.5",
+    "e5-small": "intfloat/e5-small-v2",
+    "e5-base": "intfloat/e5-base-v2",
 }
 
 GEN_MODELS = {
