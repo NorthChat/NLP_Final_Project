@@ -1,58 +1,62 @@
 """
-Generation module: Generate answers using retrieved context
+Simple, robust direct generation for FLAN-T5-XL
+No multi-pass complexity - just works!
 """
 from typing import List, Dict, Any
 import torch
-from transformers import (
-    AutoTokenizer,
-    AutoModelForSeq2SeqLM,
-    Pipeline,
-    pipeline
-)
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+import logging
 
 from config import *
 
+logging.getLogger("transformers.pipelines.base").setLevel(logging.ERROR)
+
 
 class Generator:
-    """Handles answer generation using retrieved context"""
+    """Simple direct generator - no multi-pass complexity"""
     
-    def __init__(self, model_name: str = GEN_MODELS["flan-t5-large"]):
-        """
-        Initialize generator
+    def __init__(
+        self, 
+        model_name: str = "google/flan-t5-xl",  # XL for better quality
+        default_prompt_version: int = 5
+    ):
+        self.default_prompt_version = default_prompt_version
+        self.model_name = model_name
         
-        Args:
-            model_name: Name of generation model
-        """
         print(f"[Generator] Loading model: {model_name}")
+        print(f"[Generator] Default prompt version: {default_prompt_version}")
         
-        # Check CUDA availability
         use_cuda = torch.cuda.is_available()
         
-        # Load tokenizer
+        if use_cuda:
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+            print(f"[Generator] GPU: {gpu_name} ({gpu_memory:.1f} GB VRAM)")
+        
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         
-        # Load model with appropriate settings
         if use_cuda:
-            # Use device_map="auto" for efficient GPU loading
+            print(f"[Generator] Loading model to GPU...")
             self.model = AutoModelForSeq2SeqLM.from_pretrained(
                 model_name,
                 torch_dtype=torch.float16,
                 device_map="auto"
             )
-            # Don't specify device when using device_map
             self.pipe = pipeline(
                 "text2text-generation",
                 model=self.model,
                 tokenizer=self.tokenizer
             )
-            print(f"[Generator] Model loaded on GPU with device_map='auto'")
+            
+            allocated = torch.cuda.memory_allocated(0) / 1e9
+            print(f"[Generator] ✓ Model loaded on GPU")
+            print(f"[Generator] VRAM: {allocated:.2f} GB / {gpu_memory:.1f} GB used")
         else:
-            # CPU mode - load normally
             self.model = AutoModelForSeq2SeqLM.from_pretrained(
                 model_name,
                 torch_dtype=torch.float32
             )
-            self.Pipeline = pipeline(
+            self.pipe = pipeline(
                 "text2text-generation",
                 model=self.model,
                 tokenizer=self.tokenizer,
@@ -60,332 +64,339 @@ class Generator:
             )
             print(f"[Generator] Model loaded on CPU")
     
-
     def _estimate_tokens(self, text: str) -> int:
-        """
-        Estimate token count for text
-        
-        Args:
-            text: Input text
-        
-        Returns:
-            Estimated token count
-        """
+        """Estimate token count (rough but fast)"""
         return len(self.tokenizer.encode(text, add_special_tokens=False))
     
-    def _select_best_chunks(
-        self, 
-        chunks: List[Dict[str, Any]], 
-        question: str,
-        max_context_tokens: int = 400
-    ) -> List[Dict[str, Any]]:
-        """
-        Intelligently select chunks that fit within token budget
-        
-        Prioritizes:
-        1. Highest scoring chunks (most relevant)
-        2. Diversity (different papers)
-        3. Token budget compliance
-        
-        Args:
-            chunks: List of retrieved chunks with scores
-            question: User question (for token budget calculation)
-            max_context_tokens: Maximum tokens for context
-        
-        Returns:
-            Selected chunks that fit within budget
-        """
-        # Calculate tokens for question and template
-        template_tokens = 50  # Approximate for "Context:", "Question:", etc.
-        question_tokens = self._estimate_tokens(question)
-        available_tokens = max_context_tokens - template_tokens - question_tokens
-        
-        # Sort by score (already sorted, but ensure)
-        sorted_chunks = sorted(chunks, key=lambda x: x['score'], reverse=True)
-        
-        selected = []
-        used_tokens = 0
-        seen_papers = set()
-        
-        for chunk in sorted_chunks:
-            chunk_tokens = self._estimate_tokens(chunk['text'])
-            
-            # Check if adding this chunk would exceed budget
-            if used_tokens + chunk_tokens > available_tokens:
-                # Try to fit a smaller portion of the chunk
-                if len(selected) == 0:
-                    # Must include at least one chunk
-                    # Truncate this chunk to fit
-                    selected.append(chunk)
-                break
-            
-            # Add chunk
-            selected.append(chunk)
-            used_tokens += chunk_tokens
-            seen_papers.add(chunk['meta']['paper_id'])
-            
-            # Stop if we have good coverage (3-4 chunks or 2+ papers)
-            if len(selected) >= 3 and len(seen_papers) >= 2:
-                break
-        
-        return selected
+    def _build_prompt_v1(self, question: str, context: str) -> str:
+        """Prompt version 1 - Simple and direct"""
+        return f"""Answer this question based on the research papers below.
 
-    def generate(
-        self,
-        question: str,
-        retrieved_chunks: List[Dict[str, Any]],
-        max_length: int = MAX_GEN_LENGTH,
-        include_citations: bool = True,
-        smart_selection: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Generate answer from retrieved context
-        
-        Args:
-            question: User question
-            retrieved_chunks: List of retrieved chunks from Retriever
-            max_length: Maximum generation length
-            include_citations: Whether to include source citations
-            smart_selection: Whether to use intelligent chunk selection
-        
-        Returns:
-            Dict with 'answer', 'sources', 'prompt', 'chunks_used'
-        """
+Papers:
+{context}
 
-        # Smart chunk selection to fit token budget
-        if smart_selection:
-            selected_chunks = self._select_best_chunks(
-                retrieved_chunks, 
-                question,
-                max_context_tokens=400
-            )
-        else:
-            selected_chunks = retrieved_chunks
-        
-        # Build context from retrieved chunks
-        context_parts = []
-        sources = []
-        
-        for i, chunk in enumerate(selected_chunks, 1):
-            context_parts.append(f"[{i}] {chunk['text']}")
-            sources.append({
-                "rank": chunk["rank"],
-                "paper_id": chunk["meta"]["paper_id"],
-                "score": chunk["score"]
-            })
-        
-        context = "\n\n".join(context_parts)
-        
-        # Create prompt
-        prompt = self._build_prompt(question, context)
-        
-        # CRITICAL: Check token count and truncate if needed
-        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=False)
-        input_length = inputs['input_ids'].shape[1]
-        
-        # FLAN-T5 max length is 512 tokens
-        max_input_tokens = 512
-        
-        if input_length > max_input_tokens:
-            # Emergency truncation (should rarely happen with smart selection)
-            prompt = self._build_prompt_with_truncation(question, context, max_input_tokens)
-        
-        # Generate
-        try:
-            output = self.pipe(
-                prompt,
-                max_new_tokens=max_length,
-                do_sample=False,  # Deterministic generation
-                num_beams=4,  # Beam search for better quality
-                early_stopping=True,
-                truncation=True  # Enable truncation as safety
-            )
-            
-            # Extract generated text safely
-            if isinstance(output, list) and len(output) > 0:
-                generated_text = output[0].get("generated_text", "")
-            else:
-                generated_text = ""
-            # Clean output
-            answer = str(generated_text).strip()
-            
-        except Exception as e:
-            print(f"[ERROR] Generation failed: {e}")
-            answer = "Error: Context too long. Please reduce Top-K or try a shorter query."
-        
-        return {
-            "answer": answer,
-            "sources": sources if include_citations else [],
-            "prompt": prompt,
-            "question": question,
-            "chunks_used": len(selected_chunks),
-            "chunks_available": len(retrieved_chunks)
-        }
+Question: {question}
+
+Answer:"""
     
-    def _build_prompt(self, question: str, context: str) -> str:
-        """
-        Build prompt for the model
-        
-        Template optimized for FLAN-T5
-        """
-        prompt = f"""You are an expert on fairness and bias in large language models. 
-Answer the question using SPECIFIC, CONCRETE information from the research papers below.
-The answer should be DETAILED and TECHNICAL.
-It should not be vague or general.
+    def _build_prompt_v2(self, question: str, context: str) -> str:
+        """Prompt version 2 - Structured (DEFAULT)"""
+        return f"""Based on research papers about fairness and bias in LLMs, answer this question.
 
-IMPORTANT: 
-- Include EXACT NAMES (e.g., "demographic parity", "WinoBias dataset")
-- Provide SPECIFIC FINDINGS from the papers
-- DO NOT make vague or general statements
-- Use terminology from the context
+Use specific details from the papers: technical terms, method names, datasets, metrics, and concrete findings.
 
 Research Papers:
 {context}
 
 Question: {question}
 
-Detailed answer with specific information from the papers:
-"""
-        return prompt
+Detailed Answer:"""
     
-    def _build_prompt_with_truncation(self, question: str, context: str, max_tokens: int) -> str:
-        """
-        Build prompt with truncated context to fit token limit
-        
-        This is a fallback for edge cases where smart selection isn't enough.
-        
-        Args:
-            question: User question
-            context: Full context (may be too long)
-            max_tokens: Maximum tokens allowed (512 for FLAN-T5)
-        
-        Returns:
-            Truncated prompt that fits within max_tokens
-        """
-        # Reserve tokens for prompt template and question
-        template_overhead = 50  # "Context:", "Question:", "Answer:", etc.
-        question_tokens = len(self.tokenizer.encode(question))
-        available_for_context = max_tokens - template_overhead - question_tokens - 50  # Safety margin
-        
-        # Tokenize context and truncate
-        context_tokens = self.tokenizer.encode(context, truncation=False)
-        
-        if len(context_tokens) > available_for_context:
-            # Truncate context tokens
-            truncated_tokens = context_tokens[:available_for_context]
-            truncated_context = self.tokenizer.decode(truncated_tokens, skip_special_tokens=True)
-            # Only print in verbose mode
-            # print(f"[INFO] Context truncated from {len(context_tokens)} to {available_for_context} tokens")
-        else:
-            truncated_context = context
-        
-        # Build prompt with truncated context
-        prompt = f"""Context:
-{truncated_context}
+    def _build_prompt_v3(self, question: str, context: str) -> str:
+        """Prompt version 3 - Very detailed"""
+        return f"""You are an expert on fairness and bias in large language models. Answer this question using the research papers below.
+
+Requirements:
+- Use technical terminology from the papers
+- Mention specific methods, datasets, or metrics
+- Provide 2-3 sentences with concrete details
+- Be precise and accurate
+
+Research Context:
+{context}
 
 Question: {question}
 
-Based on the context above, provide a detailed and accurate answer.
+Expert Answer:"""
+    
+    def _build_prompt_v5(self, question: str, context: str) -> str:
+        """Prompt version 5 - Constrained format"""
+        return f"""Answer with specific information from these papers.
+
+Papers:
+{context}
+
+Question: {question}
+
+Requirements:
+- Include at least 2 technical terms or specific names
+- Mention concrete findings, numbers, or methods
+- Write 2-4 sentences
 
 Answer:"""
-        
-        return prompt
     
-    def batch_generate(
+    def _build_prompt(self, question: str, context: str, version: int) -> str:
+        """Build prompt based on version"""
+        if version == 1:
+            return self._build_prompt_v1(question, context)
+        elif version == 3:
+            return self._build_prompt_v3(question, context)
+        elif version == 5:
+            return self._build_prompt_v5(question, context)
+        else:  # version 2 (default)
+            return self._build_prompt_v2(question, context)
+    
+    def _is_good_chunk(self, text: str) -> bool:
+        """
+        Filter out low-quality chunks (tables, captions, citations)
+        
+        Returns True if chunk is substantive content
+        """
+        text_lower = text.lower().strip()
+        
+        # Too short
+        if len(text.split()) < 15:
+            return False
+        
+        # Mostly numbers/symbols (likely a table)
+        non_alpha = sum(1 for c in text if not c.isalpha() and not c.isspace())
+        if non_alpha / max(len(text), 1) > 0.3:
+            return False
+        
+        # Starts with common table/caption markers
+        bad_starts = [
+            'table', 'figure', '[1]', '[2]', '[3]', '[4]', '[5]',
+            'absolute values', 'note that', 'acknowledgement'
+        ]
+        for bad in bad_starts:
+            if text_lower.startswith(bad):
+                return False
+        
+        # Too many numbers (likely table data or citations)
+        words = text.split()
+        number_words = sum(1 for w in words if any(c.isdigit() for c in w))
+        if number_words / len(words) > 0.3:
+            return False
+        
+        return True
+    
+    def generate(
         self,
-        questions: List[str],
-        retrieved_results: List[List[Dict[str, Any]]],
-        **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+        question: str,
+        retrieved_chunks: List[Dict[str, Any]],
+        max_length: int = MAX_GEN_LENGTH,
+        include_citations: bool = True,
+        prompt_version: int = None #type: ignore 
+    ) -> Dict[str, Any]:
         """
-        Generate answers for multiple questions (for evaluation)
-        
-        Args:
-            questions: List of questions
-            retrieved_results: List of retrieval results for each question
-            **kwargs: Additional arguments for generate()
-        
-        Returns:
-            List of generation results
-        """
-        results = []
-        for question, chunks in zip(questions, retrieved_results):
-            result = self.generate(question, chunks, **kwargs)
-            results.append(result)
-        return results
-    
-    def get_context_stats(self, question: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Get statistics about context size and token usage
-        
-        Useful for debugging and optimization
+        Simple direct generation from top chunks
         
         Args:
             question: User question
-            chunks: Retrieved chunks
+            retrieved_chunks: Retrieved chunks from retriever
+            max_length: Max generation length
+            include_citations: Include source information
+            prompt_version: Prompt version (1, 2, 3, or 5)
         
         Returns:
-            Dict with token statistics
+            Dict with answer and metadata
         """
-        selected = self._select_best_chunks(chunks, question)
+        if prompt_version is None:
+            prompt_version = self.default_prompt_version
         
+        print(f"[Generator] Generating answer from {len(retrieved_chunks)} chunks")
+        
+        # Sort by score (best first)
+        sorted_chunks = sorted(
+            retrieved_chunks, 
+            key=lambda x: x.get('score', 0), 
+            reverse=True
+        )
+        
+        # Filter out junk chunks
+        good_chunks = [c for c in sorted_chunks if self._is_good_chunk(c.get('text', ''))]
+        
+        #if len(good_chunks) < len(sorted_chunks):
+        #    print(f"[Generator] Filtered out {len(sorted_chunks) - len(good_chunks)} low-quality chunks")
+        
+        if len(good_chunks) == 0:
+            print(f"[Generator] Warning: No good chunks found, using top 3 anyway")
+            good_chunks = sorted_chunks[:3]
+        
+        # Build context from top chunks that fit in budget
+        context_parts = []
+        sources = []
         total_tokens = 0
-        for chunk in selected:
-            total_tokens += self._estimate_tokens(chunk['text'])
+        max_context_tokens = 380  # Leave room for prompt template and question
+        
+        for i, chunk in enumerate(good_chunks, 1):
+            # Use raw text (not expanded_text to avoid token explosion)
+            text = chunk.get('text', '')
+            if not text:
+                continue
+            
+            chunk_tokens = self._estimate_tokens(text)
+            
+            # Check if adding this chunk would exceed budget
+            if total_tokens + chunk_tokens > max_context_tokens:
+                # If we haven't added any chunks yet, truncate this one
+                if len(context_parts) == 0:
+                    words = text.split()
+                    # Take proportion of words that fit
+                    proportion = max_context_tokens / chunk_tokens
+                    truncated_words = words[:int(len(words) * proportion)]
+                    text = " ".join(truncated_words)
+                    chunk_tokens = self._estimate_tokens(text)
+                    
+                    context_parts.append(f"[{i}] {text}")
+                    sources.append({
+                        "rank": chunk.get("rank", i),
+                        "paper_id": chunk["meta"]["paper_id"],
+                        "score": chunk.get("score", 0.0)
+                    })
+                    total_tokens += chunk_tokens
+                break
+            
+            # Add this chunk
+            context_parts.append(f"[{i}] {text}")
+            sources.append({
+                "rank": chunk.get("rank", i),
+                "paper_id": chunk["meta"]["paper_id"],
+                "score": chunk.get("score", 0.0)
+            })
+            total_tokens += chunk_tokens
+        
+        # Handle edge case: no chunks fit
+        if len(context_parts) == 0:
+            return {
+                "answer": "No relevant information found in the retrieved documents.",
+                "sources": [],
+                "method": "direct",
+                "chunks_used": 0,
+                "chunks_available": len(retrieved_chunks),
+                "model": self.model_name
+            }
+        
+        # Build full prompt
+        context = "\n\n".join(context_parts)
+        prompt = self._build_prompt(question, context, prompt_version)
+        
+        # Log token usage
+        prompt_tokens = self._estimate_tokens(prompt)
+        # print(f"[Generator] Using {len(context_parts)} chunks ({total_tokens} context tokens)")
+        # print(f"[Generator] Total prompt: {prompt_tokens} tokens")
+        
+        if prompt_tokens > 500:
+            print(f"[Generator] Warning: Prompt exceeds 512 tokens, will be truncated")
+        
+        # Generate answer
+        output = self.pipe(
+            prompt,
+            max_new_tokens=max_length,
+            do_sample=False,
+            num_beams=4,
+            early_stopping=True,
+            truncation=True,
+            repetition_penalty=1.2,
+            length_penalty=1.0
+        )
+        
+        answer = output[0]["generated_text"].strip() if output else "" #type: ignore
+        
+        # Clean up answer (remove any leftover prompt artifacts)
+        if answer.startswith("Answer:"):
+            answer = answer[7:].strip()
+        
+        print(f"[Generator] Generated {len(answer.split())} words")
         
         return {
-            "question_tokens": self._estimate_tokens(question),
+            "answer": answer,
+            "sources": sources if include_citations else [],
+            "method": "direct",
+            "chunks_used": len(context_parts),
+            "chunks_available": len(retrieved_chunks),
             "context_tokens": total_tokens,
-            "chunks_selected": len(selected),
-            "chunks_available": len(chunks),
-            "within_budget": total_tokens < 400,
-            "estimated_total": self._estimate_tokens(question) + total_tokens + 50
+            "prompt_tokens": prompt_tokens,
+            "model": self.model_name
         }
 
 
-def test_generation() -> None:
-    """Test generation with sample query"""
+def test_generation():
+    """Test simple direct generation"""
     from retrieval import Retriever
     
-    print("\n" + "="*60)
-    print("TESTING GENERATION")
-    print("="*60 + "\n")
+    print("\n" + "="*70)
+    print("TESTING SIMPLE DIRECT GENERATION (FLAN-T5-XL)")
+    print("="*70 + "\n")
     
-    # Initialize
     retriever = Retriever()
     generator = Generator()
     
-    # Test query
-    question = "What are common metrics used to measure bias in large language models?"
+    test_questions = [
+        "What is Auto-Debias?",
+        "How does Auto-Debias differ from previous debiasing approaches?",
+        "How does the Auto-Debias approach search for biased prompts?"
+    ]
+    
+    for i, question in enumerate(test_questions, 1):
+        print(f"\n{'='*70}")
+        print(f"TEST {i}/{len(test_questions)}")
+        print(f"{'='*70}")
+        print(f"\nQuestion: {question}\n")
+        
+        # Retrieve (no expansion - keep it simple)
+        chunks = retriever.retrieve(question, top_k=7, include_neighbors=False)
+        
+        print(f"Retrieved {len(chunks)} chunks")
+        print(f"Top papers: {', '.join(set(c['meta']['paper_id'] for c in chunks[:3]))}")
+        print(f"Top score: {chunks[0]['score']:.3f}\n")
+        
+        # Test different prompt versions
+        for pv in [2, 5]:
+            print(f"{'-'*70}")
+            print(f"PROMPT VERSION {pv}")
+            print(f"{'-'*70}")
+            
+            result = generator.generate(question, chunks, prompt_version=pv)
+            
+            print(f"\nAnswer:\n{result['answer']}\n")
+            print(f"Chunks used: {result['chunks_used']}/{result['chunks_available']}")
+            print(f"Tokens: {result['context_tokens']} context + {result['prompt_tokens']} total")
+            print()
+        
+        if i < len(test_questions):
+            input("Press Enter for next question...")
+    
+    print("\n" + "="*70)
+    print("TESTING COMPLETE")
+    print("="*70)
+
+
+def compare_prompts():
+    """Compare all prompt versions on one question"""
+    from retrieval import Retriever
+    
+    print("\n" + "="*70)
+    print("COMPARING PROMPT VERSIONS")
+    print("="*70 + "\n")
+    
+    retriever = Retriever()
+    generator = Generator()
+    
+    question = "What is Auto-Debias?"
     
     print(f"Question: {question}\n")
     
-    # Retrieve
-    print("Retrieving relevant chunks...")
-    chunks = retriever.retrieve(question, top_k=5)
+    chunks = retriever.retrieve(question, top_k=7, include_neighbors=False)
     
-    print(f"Retrieved {len(chunks)} chunks\n")
+    print(f"Retrieved: {len(chunks)} chunks\n")
     
-    # Check context stats
-    stats = generator.get_context_stats(question, chunks)
-    print("Context Statistics:")
-    print(f"  Question tokens: {stats['question_tokens']}")
-    print(f"  Context tokens: {stats['context_tokens']}")
-    print(f"  Chunks selected: {stats['chunks_selected']}/{stats['chunks_available']}")
-    print(f"  Within budget: {stats['within_budget']}")
-    print(f"  Estimated total: {stats['estimated_total']}/512")
-    print()
+    for version in [1, 2, 3, 5]:
+        print(f"\n{'='*70}")
+        print(f"PROMPT VERSION {version}")
+        print(f"{'='*70}")
+        
+        result = generator.generate(question, chunks, prompt_version=version)
+        
+        print(f"\nAnswer:\n{result['answer']}\n")
+        print(f"Length: {len(result['answer'].split())} words")
+        print()
 
-    # Generate
-    print("Generating answer...")
-    result = generator.generate(question, chunks)
-    
-    print(f"\nAnswer:\n{result['answer']}\n")
-    
-    print(f"Chunks used: {result['chunks_used']}/{result['chunks_available']}")
-    print("\nSources:")
-    for src in result['sources']:
-        print(f"  [{src['rank']}] {src['paper_id']} (score: {src['score']:.3f})")
 
 if __name__ == "__main__":
-    test_generation()
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "--compare":
+        compare_prompts()
+    else:
+        test_generation()

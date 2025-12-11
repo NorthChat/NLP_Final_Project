@@ -1,9 +1,10 @@
 """
-Main entry point for the RAG system - A GRADE VERSION
+Main entry point for the RAG system - WITH E5 MODEL SUPPORT
 
 Usage:
-    python src/main.py --prepare                    # Prepare dataset (first time)
-    python src/main.py --prepare --ablation         # Run ablation study (A requirement)
+    python src/main.py --prepare                    # Prepare dataset
+    python src/main.py --prepare --model e5-base    # Prepare with E5 model
+    python src/main.py --prepare --ablation         # Run ablation study
     python src/main.py --ui                         # Launch UI
     python src/main.py --evaluate                   # Run evaluation
     python src/main.py --test                       # Quick test
@@ -28,7 +29,7 @@ def run_ablation_study():
     """
     Run ablation study comparing different configurations
     
-    - Compare embedding models (MiniLM vs BGE)
+    - Compare embedding models (MiniLM vs BGE vs E5)
     - Compare chunk sizes (250 vs 450)
     - Generate comprehensive comparison
     """
@@ -54,6 +55,13 @@ def run_ablation_study():
         {"embed": "minilm", "chunk_size": 450, "name": "MiniLM-450"},
     ]
     
+    # Add E5 if available
+    if "e5-base" in EMBED_MODELS:
+        configs.extend([
+            {"embed": "e5-base", "chunk_size": 450, "name": "E5-Base-450"},
+            {"embed": "e5-base", "chunk_size": 250, "name": "E5-Base-250"},
+        ])
+    
     results = {}
     
     for config in configs:
@@ -68,7 +76,7 @@ def run_ablation_study():
         prepare_dataset(
             embed_model=embed_model,
             chunk_size=config['chunk_size'],
-            force_rebuild=True,  # Force rebuild to get different datasets
+            force_rebuild=True,
             use_sentence_chunking=True
         )
         
@@ -142,8 +150,8 @@ def run_ablation_study():
     axes[1].set_xlabel('Configuration')
     axes[1].set_ylabel('ROUGE-L Score')
     axes[1].set_title('Ablation Study: Generation Performance')
-    axes[1].set_xticks(x)  # Set ticks first
-    axes[1].set_xticklabels(names, rotation=45, ha='right')  # Then labels
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(names, rotation=45, ha='right')
     axes[1].grid(True, alpha=0.3, axis='y')
     
     plt.tight_layout()
@@ -171,13 +179,28 @@ def quick_test():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="RAG System for Fairness & Bias in LLMs - A GRADE VERSION"
+        description="RAG System for Fairness & Bias in LLMs - WITH E5 SUPPORT"
     )
     
     parser.add_argument(
         "--prepare",
         action="store_true",
         help="Prepare dataset (PDF → chunks → embeddings → index)"
+    )
+    
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="minilm",
+        choices=list(EMBED_MODELS.keys()),
+        help="Embedding model to use (default: minilm)"
+    )
+    
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=250,
+        help="Chunk size in words (default: 250)"
     )
     
     parser.add_argument(
@@ -228,20 +251,49 @@ def main():
     if len(sys.argv) == 1:
         parser.print_help()
         print("\n" + "="*60)
+        print("QUICK START GUIDE")
         print("="*60)
-        print("1. Run: python src/main.py --prepare")
-        print("2. Run: python src/main.py --prepare --ablation")
-        print("3. Run: python src/main.py --evaluate")
-        print("4. Run: python src/main.py --ui")
+        print("\n1. Prepare with MiniLM (fast):")
+        print("   python src/main.py --prepare --model minilm")
+        print("\n2. Prepare with E5-Base (better quality):")
+        print("   python src/main.py --prepare --model e5-base")
+        print("\n3. Prepare with BGE:")
+        print("   python src/main.py --prepare --model bge")
+        print("\n4. Run ablation study:")
+        print("   python src/main.py --prepare --ablation")
+        print("\n5. Test the system:")
+        print("   python src/main.py --test")
+        print("\n6. Launch UI:")
+        print("   python src/main.py --ui")
+        print("\n7. Run evaluation:")
+        print("   python src/main.py --evaluate")
         print("="*60 + "\n")
+        
+        # Show available models
+        print("Available embedding models:")
+        for key, model in EMBED_MODELS.items():
+            is_e5 = "e5-" in model.lower()
+            e5_mark = " (E5 - needs query/passage prefixes)" if is_e5 else ""
+            print(f"  - {key}: {model}{e5_mark}")
+        print()
+        
         sys.exit(0)
     
     # Execute commands
     if args.prepare:
+        embed_model = EMBED_MODELS[args.model]
+        
+        print("\n" + "="*60)
+        print(f"Selected model: {embed_model}")
+        print(f"Chunk size: {args.chunk_size}")
+        print("="*60 + "\n")
+        
         if args.ablation:
             run_ablation_study()
         else:
             prepare_dataset(
+                embed_model=embed_model,
+                chunk_size=args.chunk_size,
                 force_rebuild=args.force_rebuild,
                 incremental=not args.no_incremental
             )

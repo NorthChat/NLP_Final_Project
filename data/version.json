@@ -1,0 +1,121 @@
+{
+  "version": 15,
+  "created": "2025-12-03T17:00:11.315094",
+  "last_updated": "2025-12-05T04:16:53.049751",
+  "processed_files": {
+    "ai_ai_bias.pdf": {
+      "hash": "d96f6aad00fc46e659a6434283a24b5f",
+      "chunk_count": 79,
+      "timestamp": "2025-12-05T04:14:09.176372"
+    },
+    "auto_debias.pdf": {
+      "hash": "64aacdc7d48518d903815058a5c3274d",
+      "chunk_count": 81,
+      "timestamp": "2025-12-05T04:14:14.155623"
+    },
+    "clear_bias.pdf": {
+      "hash": "c94e4aeda4b59bd7b7fa78378c3a125d",
+      "chunk_count": 208,
+      "timestamp": "2025-12-05T04:14:27.941004"
+    },
+    "comprehensive_survey.pdf": {
+      "hash": "8e798b1a5166d6cad7db0df6d3e98e25",
+      "chunk_count": 69,
+      "timestamp": "2025-12-05T04:14:31.338486"
+    },
+    "crow_s_pairs.pdf": {
+      "hash": "5db711098b63a4bda9467e81bcb3dea3",
+      "chunk_count": 106,
+      "timestamp": "2025-12-05T04:14:36.282098"
+    },
+    "data_aug_for_llm_generalization.pdf": {
+      "hash": "9747265c86e758f0e71a087e74f41709",
+      "chunk_count": 135,
+      "timestamp": "2025-12-05T04:14:45.273921"
+    },
+    "fairflow.pdf": {
+      "hash": "0330c46608bc22aa83bf424e8480759c",
+      "chunk_count": 85,
+      "timestamp": "2025-12-05T04:14:49.703034"
+    },
+    "fairness_in_rag.pdf": {
+      "hash": "3d8ae34da284ca9caadf55740e4e563f",
+      "chunk_count": 107,
+      "timestamp": "2025-12-05T04:14:56.803499"
+    },
+    "flex.pdf": {
+      "hash": "6a219e61ad19b0069b23594dfd54cce6",
+      "chunk_count": 88,
+      "timestamp": "2025-12-05T04:15:01.921811"
+    },
+    "generalization_bias_in_llms.pdf": {
+      "hash": "81b664343ad213732d3531a431ccd164",
+      "chunk_count": 87,
+      "timestamp": "2025-12-05T04:15:08.380864"
+    },
+    "impossible_fair_llms.pdf": {
+      "hash": "27f3033f421e8d8ef4c2d6008f2b5ca5",
+      "chunk_count": 65,
+      "timestamp": "2025-12-05T04:15:13.487068"
+    },
+    "improving_llm_fairness.pdf": {
+      "hash": "39dda3c156a84e8322bc210f61a7c3e5",
+      "chunk_count": 143,
+      "timestamp": "2025-12-05T04:15:22.701806"
+    },
+    "knowledge_distillation_amplifies_gender_bias.pdf": {
+      "hash": "64df2b4c5f0628a92276361a7bd351f1",
+      "chunk_count": 37,
+      "timestamp": "2025-12-05T04:15:24.895686"
+    },
+    "llm_model_bias_mitigation.pdf": {
+      "hash": "0a4e1814d5a600f194b9108853fcdbbb",
+      "chunk_count": 66,
+      "timestamp": "2025-12-05T04:15:28.356544"
+    },
+    "measuring_bias.pdf": {
+      "hash": "d2cc4563cde44c56bf25d08b0a6dd90c",
+      "chunk_count": 45,
+      "timestamp": "2025-12-05T04:15:31.433307"
+    },
+    "self_debiasing_llms.pdf": {
+      "hash": "844fc177db1e15b45032b70882a61b19",
+      "chunk_count": 75,
+      "timestamp": "2025-12-05T04:15:35.711836"
+    },
+    "stereoset.pdf": {
+      "hash": "ed6d663a3810a48f5fb8b205a4d5176d",
+      "chunk_count": 91,
+      "timestamp": "2025-12-05T04:15:41.654079"
+    },
+    "survey.pdf": {
+      "hash": "c639b152141cb36cf3120b491fa72e7c",
+      "chunk_count": 328,
+      "timestamp": "2025-12-05T04:16:04.667335"
+    },
+    "survey_llm_forgetting.pdf": {
+      "hash": "11e15036ab5a6b75aeef22b424e6048d",
+      "chunk_count": 163,
+      "timestamp": "2025-12-05T04:16:14.988522"
+    },
+    "taxonomic_survey.pdf": {
+      "hash": "6829dd724fd215400efee4c8263620ae",
+      "chunk_count": 101,
+      "timestamp": "2025-12-05T04:16:20.276822"
+    },
+    "unibias.pdf": {
+      "hash": "0f8f27ed4df5fbd9290708ad52f4b33b",
+      "chunk_count": 127,
+      "timestamp": "2025-12-05T04:16:27.506257"
+    }
+  },
+  "total_chunks": 2286,
+  "config": {
+    "embed_model": "intfloat/e5-base-v2",
+    "is_e5_model": true,
+    "chunk_size": 250,
+    "use_sentence_chunking": true,
+    "min_words": 20,
+    "min_chars": 100
+  }
+}

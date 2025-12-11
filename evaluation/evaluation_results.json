@@ -1,0 +1,33 @@
+{
+  "retrieval": {
+    "3": {
+      "precision@k": 0.2553763440860215,
+      "recall@k": 0.7661290322580645,
+      "mrr@k": 0.7379032258064516,
+      "num_queries": 124
+    },
+    "5": {
+      "precision@k": 0.1564516129032258,
+      "recall@k": 0.782258064516129,
+      "mrr@k": 0.7419354838709677,
+      "num_queries": 124
+    },
+    "10": {
+      "precision@k": 0.08225806451612902,
+      "recall@k": 0.8225806451612904,
+      "mrr@k": 0.7482078853046594,
+      "num_queries": 124
+    }
+  },
+  "generation": {
+    "rouge1": 0.2518560697769018,
+    "rouge2": 0.09958189480835306,
+    "rougeL": 0.20031311799909363,
+    "num_examples": 124
+  },
+  "error_counts": {
+    "low_retrieval_score": 0,
+    "short_answers": 32,
+    "no_relevant_retrieved": 22
+  }
+}

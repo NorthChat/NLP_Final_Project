@@ -1,0 +1,460 @@
+{
+  "low_retrieval_score": [],
+  "short_answers": [
+    {
+      "id": 2,
+      "question": "How does the Auto-Debias approach search for biased prompts?",
+      "answer": "maximizing disagreement between the masked language model (MLM) completions",
+      "length": 9
+    },
+    {
+      "id": 9,
+      "question": "What is the CLEAR-Bias dataset?",
+      "answer": "a curated dataset of bias-related prompts",
+      "length": 6
+    },
+    {
+      "id": 10,
+      "question": "What does the CLEAR-Bias dataset consist of?",
+      "answer": "bias-related prompts",
+      "length": 2
+    },
+    {
+      "id": 13,
+      "question": "Which LLM was identified as the most reliable judge in the CLEAR-Bias study and why?",
+      "answer": "DeepSeek V3",
+      "length": 2
+    },
+    {
+      "id": 14,
+      "question": "What were the key findings about bias categories in the CLEAR-Bias evaluation?",
+      "answer": "age, disability, and intersectional biases among the most prominent",
+      "length": 9
+    },
+    {
+      "id": 24,
+      "question": "What are the main categories of bias identified in the comprehensive survey of LLM biases?",
+      "answer": "Demographic, contextual, and algorithmic biases",
+      "length": 5
+    },
+    {
+      "id": 25,
+      "question": "What are the major sources of bias in LLMs according to the comprehensive survey?",
+      "answer": "We systematically categorize biases into several dimensions.",
+      "length": 7
+    },
+    {
+      "id": 27,
+      "question": "What types of demographic bias does it include?",
+      "answer": "age gender nationality race religion sexual orientation, and profession",
+      "length": 9
+    },
+    {
+      "id": 30,
+      "question": "What are the current limitations in bias evaluation and mitigation for LLMs?",
+      "answer": "Lack of Standardized and Intersectional Bias Evaluation Metrics",
+      "length": 8
+    },
+    {
+      "id": 38,
+      "question": "What is CATO?",
+      "answer": "Causal-structure Driven Augmentations for Text OOD Generalization",
+      "length": 7
+    },
+    {
+      "id": 41,
+      "question": "Why is counterfactual data augmentation preferred over the Reweighting method based on sample complexity arguments?",
+      "answer": "We show favorable generalization bounds for accurately performed data-augmentation.",
+      "length": 9
+    },
+    {
+      "id": 45,
+      "question": "What metric demonstrates that the error correction scheme successfully improves the fluency of the generated text?",
+      "answer": "perplexity",
+      "length": 1
+    },
+    {
+      "id": 48,
+      "question": "What were the three types of generalizations analyzed in the study?",
+      "answer": "Generic generalizations (generics)",
+      "length": 3
+    },
+    {
+      "id": 53,
+      "question": "What is FLEX?",
+      "answer": "Fairness Benchmark in LLM under Extreme Scenarios",
+      "length": 7
+    },
+    {
+      "id": 55,
+      "question": "What are the three main categories of adversarial variants used to construct the FLEX benchmark?",
+      "answer": "Persona Injection, Competing Objectives, Text Attack",
+      "length": 6
+    },
+    {
+      "id": 57,
+      "question": "Which adversarial category was found to be the most effective, especially against open-source models?",
+      "answer": "Competing Objectives",
+      "length": 2
+    },
+    {
+      "id": 60,
+      "question": "What evaluation framework was proposed to assess fairness in RAG methods?",
+      "answer": "using scenario-based questions and analyzing disparities across demographic attributes",
+      "length": 9
+    },
+    {
+      "id": 65,
+      "question": "What simple and effective strategy was identified to mitigate bias by modifying the retrieved documents?",
+      "answer": "affine concept editing (ACE)",
+      "length": 4
+    },
+    {
+      "id": 75,
+      "question": "What two factors in the Knowledge Distillation process were identified as contributing to gender bias amplification?",
+      "answer": "cross-entropy loss between the logits and the model capacity",
+      "length": 9
+    },
+    {
+      "id": 77,
+      "question": "What is the proposed novel, automated mechanism for debiasing LLMs?",
+      "answer": "Dataset augmentation",
+      "length": 2
+    },
+    {
+      "id": 80,
+      "question": "What new metrics were proposed to quantify bias in datasets and models?",
+      "answer": "db-index and mb-index",
+      "length": 3
+    },
+    {
+      "id": 85,
+      "question": "What internal bias mitigation technique did the study propose?",
+      "answer": "affine concept editing",
+      "length": 3
+    },
+    {
+      "id": 89,
+      "question": "What is the primary purpose of StereoSet?",
+      "answer": "measure the biases of pretrained language models",
+      "length": 7
+    },
+    {
+      "id": 90,
+      "question": "What two types of Context Association Tests (CATs) are used in StereoSet, and how are they structured?",
+      "answer": "Intrasentence and intersentence",
+      "length": 3
+    },
+    {
+      "id": 93,
+      "question": "Which family of models exhibited the most idealistic behavior (highest ICAT score) on StereoSet?",
+      "answer": "ROBERTA and XLNET",
+      "length": 3
+    },
+    {
+      "id": 96,
+      "question": "What were the two approaches proposed for zero-shot self-debiasing?",
+      "answer": "Bias Benchmark for QA (BBQ)",
+      "length": 5
+    },
+    {
+      "id": 104,
+      "question": "How does UniBias mitigate bias internally?",
+      "answer": "By addressing their root causes internally from LLMs",
+      "length": 8
+    },
+    {
+      "id": 108,
+      "question": "What are the four stages used to categorize algorithms for mitigating bias in LLMs?",
+      "answer": "pre-processing, in-training, intra-processing, and postprocessing",
+      "length": 5
+    },
+    {
+      "id": 114,
+      "question": "What are the three main categories of LLMs unlearning algorithms?",
+      "answer": "parameter modification, input modification, and robust unlearning",
+      "length": 7
+    },
+    {
+      "id": 116,
+      "question": "Which two threat models are used for robustness evaluations to test if unlearned data can be recovered?",
+      "answer": "adversarial attacks and mali cious interrogations",
+      "length": 6
+    },
+    {
+      "id": 117,
+      "question": "What three main taxonomies are used to unify the literature on bias and fairness in LLMs?",
+      "answer": "metrics and datasets, and one for mitigation",
+      "length": 7
+    },
+    {
+      "id": 123,
+      "question": "What is FLEX?",
+      "answer": "Fairness Benchmark in LLM under Extreme Scenarios",
+      "length": 7
+    }
+  ],
+  "no_relevant_retrieved": [
+    {
+      "id": 18,
+      "question": "What is the CrowS-Pairs dataset?",
+      "expected": [
+        "comprehensive_survey"
+      ],
+      "got": [
+        "crow_s_pairs",
+        "survey",
+        "auto_debias"
+      ]
+    },
+    {
+      "id": 19,
+      "question": "What does the CrowS-Pairs dataset measure?",
+      "expected": [
+        "comprehensive_survey"
+      ],
+      "got": [
+        "crow_s_pairs",
+        "survey",
+        "auto_debias"
+      ]
+    },
+    {
+      "id": 20,
+      "question": "How does the CrowS-Pairs metric evaluate bias in masked language models?",
+      "expected": [
+        "comprehensive_survey"
+      ],
+      "got": [
+        "clear_bias",
+        "crow_s_pairs",
+        "taxonomic_survey"
+      ]
+    },
+    {
+      "id": 21,
+      "question": "What were the main results when evaluating BERT, RoBERTa, and ALBERT on CrowS-Pairs?",
+      "expected": [
+        "comprehensive_survey"
+      ],
+      "got": [
+        "crow_s_pairs",
+        "auto_debias"
+      ]
+    },
+    {
+      "id": 22,
+      "question": "What validation process was used for CrowS-Pairs and how did it compare to StereoSet?",
+      "expected": [
+        "comprehensive_survey"
+      ],
+      "got": [
+        "crow_s_pairs",
+        "auto_debias"
+      ]
+    },
+    {
+      "id": 23,
+      "question": "What are the key differences between stereotype and anti-stereotype examples in bias evaluation?",
+      "expected": [
+        "comprehensive_survey"
+      ],
+      "got": [
+        "crow_s_pairs",
+        "stereoset",
+        "survey"
+      ]
+    },
+    {
+      "id": 24,
+      "question": "What are the main categories of bias identified in the comprehensive survey of LLM biases?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "comprehensive_survey",
+        "taxonomic_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 25,
+      "question": "What are the major sources of bias in LLMs according to the comprehensive survey?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "taxonomic_survey",
+        "comprehensive_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 26,
+      "question": "What is demographic bias in LLMs?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "comprehensive_survey",
+        "taxonomic_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 28,
+      "question": "What recent techniques have been developed for bias evaluation and mitigation in LLMs?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "clear_bias",
+        "comprehensive_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 29,
+      "question": "What is the LLM Bias Index (LLMBI) and how does it work?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "clear_bias",
+        "comprehensive_survey",
+        "llm_model_bias_mitigation"
+      ]
+    },
+    {
+      "id": 30,
+      "question": "What are the current limitations in bias evaluation and mitigation for LLMs?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "clear_bias",
+        "comprehensive_survey",
+        "flex"
+      ]
+    },
+    {
+      "id": 31,
+      "question": "What future research directions are proposed for addressing bias in LLMs?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "clear_bias",
+        "comprehensive_survey",
+        "ai_ai_bias"
+      ]
+    },
+    {
+      "id": 32,
+      "question": "How did the evolution of language models contribute to bias issues?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "measuring_bias",
+        "clear_bias",
+        "llm_model_bias_mitigation"
+      ]
+    },
+    {
+      "id": 33,
+      "question": "What is contextual bias and how does it manifest in domain-specific applications?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "stereoset",
+        "measuring_bias",
+        "comprehensive_survey"
+      ]
+    },
+    {
+      "id": 34,
+      "question": "What methods exist for detecting and measuring bias in LLMs?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "clear_bias",
+        "comprehensive_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 35,
+      "question": "What are the social and operational implications of bias in LLMs?",
+      "expected": [
+        "crow_s_pairs"
+      ],
+      "got": [
+        "taxonomic_survey",
+        "comprehensive_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 117,
+      "question": "What three main taxonomies are used to unify the literature on bias and fairness in LLMs?",
+      "expected": [
+        "survey_pdf"
+      ],
+      "got": [
+        "taxonomic_survey",
+        "survey",
+        "impossible_fair_llms"
+      ]
+    },
+    {
+      "id": 118,
+      "question": "How is Social Bias broadly defined in the context of LLMs?",
+      "expected": [
+        "survey_pdf"
+      ],
+      "got": [
+        "taxonomic_survey",
+        "comprehensive_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 119,
+      "question": "What are the two main categories of harm encompassed by Social Bias?",
+      "expected": [
+        "survey_pdf"
+      ],
+      "got": [
+        "taxonomic_survey",
+        "survey"
+      ]
+    },
+    {
+      "id": 120,
+      "question": "What are three core Fairness Desiderata proposed for LLMs to generalize fairness notions beyond simple classification tasks?",
+      "expected": [
+        "survey_pdf"
+      ],
+      "got": [
+        "taxonomic_survey",
+        "survey",
+        "impossible_fair_llms"
+      ]
+    },
+    {
+      "id": 121,
+      "question": "What are the major limitations of Pre-Processing Mitigation techniques, particularly those relying on Data Augmentation?",
+      "expected": [
+        "survey_pdf"
+      ],
+      "got": [
+        "comprehensive_survey",
+        "survey",
+        "data_aug_for_llm_generalization"
+      ]
+    }
+  ]
+}

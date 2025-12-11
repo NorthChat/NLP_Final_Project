@@ -1,6 +1,6 @@
 """
 Data preparation: PDF extraction, chunking, embedding, and indexing
-WITH VERSIONING AND INCREMENTAL UPDATES
+WITH E5 MODEL SUPPORT
 """
 import json
 import re
@@ -30,9 +30,39 @@ from config import *
 # CONFIGURATION
 # ===========================
 
-MIN_WORDS = 20  # Minimum words per chunk
-MIN_CHARS = 100  # Minimum characters per chunk
-MAX_CHUNK_RATIO = 0.95  # Maximum similarity ratio for deduplication
+MIN_WORDS = 20
+MIN_CHARS = 100
+MAX_CHUNK_RATIO = 0.95
+
+
+# ===========================
+# E5 MODEL DETECTION AND PREPROCESSING
+# ===========================
+
+def is_e5_model(model_name: str) -> bool:
+    """Check if the model is an E5 model"""
+    return "e5-" in model_name.lower() or "e5_" in model_name.lower()
+
+
+def prepare_texts_for_embedding(texts: List[str], embed_model: str) -> List[str]:
+    """
+    Prepare texts for embedding based on model type
+    
+    E5 models require:
+    - "passage: " prefix for documents during indexing
+    - "query: " prefix for queries during retrieval
+    
+    Args:
+        texts: List of text chunks
+        embed_model: Name of embedding model
+    
+    Returns:
+        Processed texts ready for embedding
+    """
+    if is_e5_model(embed_model):
+        print(f"[INFO] E5 model detected: Adding 'passage: ' prefix to documents")
+        return [f"passage: {text}" for text in texts]
+    return texts
 
 
 # ===========================
@@ -41,33 +71,18 @@ MAX_CHUNK_RATIO = 0.95  # Maximum similarity ratio for deduplication
 
 def clean_text(text: str) -> str:
     """Clean extracted text from PDFs"""
-    # Normalize unicode characters
     text = unicodedata.normalize("NFKC", text)
-
-    # Remove zero-width and special spaces
-    text = text.replace("\u200b", "")  # zero-width space
-    text = text.replace("\u00ad", "")  # soft hyphen
-    text = text.replace("\ufeff", "")  # BOM
-    text = text.replace("\xa0", " ")   # non-breaking space
-
-    # Remove Private Use Area characters (PUA)
+    text = text.replace("\u200b", "")
+    text = text.replace("\u00ad", "")
+    text = text.replace("\ufeff", "")
+    text = text.replace("\xa0", " ")
     text = re.sub(r'[\uf000-\uf8ff]', '', text)
-
-    # Remove excessive whitespace
     text = re.sub(r'\s+', ' ', text)
-    
-    # Remove page numbers and common artifacts
     text = re.sub(r'\n\d+\n', '\n', text)
-
-    # Handle hyphenated breaks
     text = text.replace("-\n", "")
     text = text.replace("- ", "")
     text = text.replace("\n", " ")
-
-    # Remove email artifacts
     text = re.sub(r'\S+@\S+', '', text)
-
-    # Remove URLs and identifiers
     text = re.sub(r'http\S+', '', text)
     text = re.sub(r"/abs/\d{4}\.\d{5}", "", text)
     text = re.sub(r"arXiv:\d{4}\.\d{5}", "", text)
@@ -75,13 +90,8 @@ def clean_text(text: str) -> str:
     text = re.sub(r"www\.\S+", "", text)
     text = re.sub(r'\bhttps?://\S+\b', '', text)
     text = re.sub(r'\bwww\.\S+\b', '', text)
-
-    # Collapse whitespace
     text = re.sub(r'\s+', ' ', text)
-    
-    # Fix text encoding issues
     text = ftfy.fix_text(text)
-
     return text.strip()
 
 
@@ -105,17 +115,7 @@ def pdf_to_text(pdf_path: Path) -> str:
 # ===========================
 
 def chunk_text(text: str, chunk_size: int = 250, overlap: int = 100) -> List[str]:
-    """
-    Chunk text using sliding window on words.
-    
-    Args:
-        text: Input text
-        chunk_size: Number of words per chunk
-        overlap: Number of overlapping words between chunks
-    
-    Returns:
-        List of text chunks
-    """
+    """Chunk text using sliding window on words"""
     words = text.split()
     chunks = []
     i = 0
@@ -136,17 +136,7 @@ def chunk_text(text: str, chunk_size: int = 250, overlap: int = 100) -> List[str
 
 
 def sentence_level_chunking(text: str, max_sentences: int = 5, overlap_sentences: int = 1) -> List[str]:
-    """
-    Alternative chunking: sentence-based (for A grade improvement)
-    
-    Args:
-        text: Input text
-        max_sentences: Maximum sentences per chunk
-        overlap_sentences: Number of overlapping sentences
-    
-    Returns:
-        List of text chunks
-    """
+    """Alternative chunking: sentence-based"""
     doc = nlp(text)
     sentences = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
     
@@ -167,36 +157,24 @@ def sentence_level_chunking(text: str, max_sentences: int = 5, overlap_sentences
 
 def compute_chunk_hash(text: str) -> str:
     """Compute hash for chunk deduplication"""
-    # Normalize text for hashing (lowercase, strip)
     normalized = text.lower().strip()
     return hashlib.md5(normalized.encode()).hexdigest()
 
 
 def filter_chunks(chunks: List[str]) -> List[str]:
-    """
-    Remove duplicates and very short chunks
-    
-    Args:
-        chunks: List of text chunks
-    
-    Returns:
-        Filtered list of chunks
-    """
+    """Remove duplicates and very short chunks"""
     seen_hashes: Set[str] = set()
     filtered = []
     
     for chunk in chunks:
         text = chunk.strip()
         
-        # Filter 1: Minimum length (words)
         if len(text.split()) < MIN_WORDS:
             continue
         
-        # Filter 2: Minimum length (characters)
         if len(text) < MIN_CHARS:
             continue
         
-        # Filter 3: Deduplicate by hash
         chunk_hash = compute_chunk_hash(text)
         if chunk_hash in seen_hashes:
             continue
@@ -205,21 +183,6 @@ def filter_chunks(chunks: List[str]) -> List[str]:
         filtered.append(text)
     
     return filtered
-
-
-def is_chunk_similar(chunk1: str, chunk2: str, threshold: float = MAX_CHUNK_RATIO) -> bool:
-    """Check if two chunks are too similar (for near-duplicate detection)"""
-    words1 = set(chunk1.lower().split())
-    words2 = set(chunk2.lower().split())
-    
-    if not words1 or not words2:
-        return False
-    
-    intersection = len(words1 & words2)
-    union = len(words1 | words2)
-    
-    jaccard = intersection / union if union > 0 else 0
-    return jaccard > threshold
 
 
 # ===========================
@@ -242,7 +205,7 @@ class DatasetVersion:
             "version": 0,
             "created": datetime.now().isoformat(),
             "last_updated": datetime.now().isoformat(),
-            "processed_files": {},  # {filename: {hash, chunk_count, timestamp}}
+            "processed_files": {},
             "total_chunks": 0,
             "config": {}
         }
@@ -288,7 +251,7 @@ class DatasetVersion:
         return set(self.version_data["processed_files"].keys())
     
     def remove_file(self, filename: str):
-        """Remove file from processed list (if deleted)"""
+        """Remove file from processed list"""
         if filename in self.version_data["processed_files"]:
             del self.version_data["processed_files"][filename]
     
@@ -296,15 +259,6 @@ class DatasetVersion:
         """Update configuration"""
         self.version_data["config"] = config
         self._save_version()
-    
-    def get_stats(self) -> Dict:
-        """Get version statistics"""
-        return {
-            "version": self.version_data["version"],
-            "files_processed": len(self.version_data["processed_files"]),
-            "total_chunks": self.version_data["total_chunks"],
-            "last_updated": self.version_data["last_updated"]
-        }
 
 
 # ===========================
@@ -332,25 +286,33 @@ def load_existing_data() -> Tuple[List[Dict], List[Dict], NDArray[np.float32] | 
 
 
 def prepare_dataset(
-    embed_model: str = EMBED_MODELS["minilm"],
+    embed_model: str = EMBED_MODELS["e5-base"],
     chunk_size: int = 250,
-    use_sentence_chunking: bool = False,
+    use_sentence_chunking: bool = True,
     force_rebuild: bool = False,
     incremental: bool = True
 ):
     """
-    Main data preparation pipeline with versioning and incremental updates
+    Main data preparation pipeline with E5 support
     
     Args:
-        embed_model: Name of embedding model
+        embed_model: Name of embedding model (can be E5)
         chunk_size: Size of chunks (if word-based)
         use_sentence_chunking: Use sentence-based chunking instead
-        force_rebuild: Force complete rebuild (ignore incremental)
-        incremental: Use incremental indexing (add only new/changed PDFs)
+        force_rebuild: Force complete rebuild
+        incremental: Use incremental indexing
     """
     print(f"\n{'='*60}")
     print(f"PREPARING DATASET {'(INCREMENTAL)' if incremental and not force_rebuild else '(FULL REBUILD)'}")
     print(f"{'='*60}\n")
+    
+    # Check if E5 model
+    is_e5 = is_e5_model(embed_model)
+    if is_e5:
+        print(f"⚠️  E5 MODEL DETECTED: {embed_model}")
+        print(f"    Documents will be prefixed with 'passage: '")
+        print(f"    Queries must be prefixed with 'query: ' (handled by Retriever)")
+        print()
     
     # Create directories
     DATA_DIR.mkdir(exist_ok=True)
@@ -380,25 +342,19 @@ def prepare_dataset(
     
     if incremental and not force_rebuild:
         print("\n[INFO] Checking for changes...")
-        
-        # Load existing data
         existing_chunks, existing_metas, existing_embeddings = load_existing_data()
         print(f"[INFO] Loaded {len(existing_chunks)} existing chunks")
         
-        # Find new/modified files
         current_files = {p.name for p in pdf_paths}
         processed_files = version_manager.get_processed_files()
         
-        # Files to remove (deleted PDFs)
         removed_files = processed_files - current_files
         for removed in removed_files:
             print(f"[INFO] Removed file detected: {removed}")
             version_manager.remove_file(removed)
-            # Remove chunks from this file
             existing_chunks = [c for c in existing_chunks if c["paper_id"] != Path(removed).stem]
             existing_metas = [m for m in existing_metas if m["paper_id"] != Path(removed).stem]
         
-        # Files to process (new or modified)
         files_to_process = []
         for pdf_path in pdf_paths:
             if not version_manager.is_file_processed(pdf_path):
@@ -415,8 +371,6 @@ def prepare_dataset(
             return
         
         print(f"\n[INFO] Processing {len(files_to_process)} new/modified files...")
-        
-        # Start with existing data
         all_chunks = existing_chunks
         all_metas = existing_metas
         
@@ -437,28 +391,23 @@ def prepare_dataset(
     for pdf in tqdm(files_to_process, desc="Processing PDFs"):
         paper_id = pdf.stem
         
-        # Remove old chunks from this paper (if modified)
         if incremental:
             all_chunks = [c for c in all_chunks if c["paper_id"] != paper_id]
             all_metas = [m for m in all_metas if m["paper_id"] != paper_id]
         
-        # Extract text
         text = pdf_to_text(pdf)
         
         if len(text.strip()) < 100:
             print(f"\n[WARNING] Skipping {pdf.name} - insufficient text extracted")
             continue
         
-        # Chunk text
         if use_sentence_chunking:
             chunks = sentence_level_chunking(text)
         else:
             chunks = chunk_text(text, chunk_size, CHUNK_OVERLAP)
         
-        # Filter chunks
         chunks = filter_chunks(chunks)
         
-        # Store chunks with metadata
         for idx, chunk in enumerate(chunks):
             chunk_id = f"{paper_id}_chunk{idx}"
             new_chunks.append({
@@ -471,16 +420,14 @@ def prepare_dataset(
                 "chunk_id": chunk_id
             })
         
-        # Mark file as processed
         version_manager.mark_file_processed(pdf, len(chunks))
     
-    # Combine with existing
     all_chunks.extend(new_chunks)
     all_metas.extend(new_metas)
     
     print(f"\n[INFO] Total chunks: {len(all_chunks)} ({len(new_chunks)} new)")
     
-    # Global deduplication across all chunks
+    # Global deduplication
     print("[INFO] Performing global deduplication...")
     chunk_texts = [c["text"] for c in all_chunks]
     filtered_indices = []
@@ -512,39 +459,26 @@ def prepare_dataset(
     print(f"[INFO] Saved chunks to {CHUNKS_FILE}")
     
     # ===========================
-    # STEP 2: Generate Embeddings
+    # STEP 2: Generate Embeddings WITH E5 SUPPORT
     # ===========================
     
     print(f"\n[INFO] Loading embedding model: {embed_model}")
     embedder = SentenceTransformer(embed_model, device=device)
     
-    if incremental and existing_embeddings is not None and len(new_chunks) > 0:
-        # Only embed new chunks
-        print(f"[INFO] Generating embeddings for {len(new_chunks)} new chunks...")
-        new_chunk_texts = [c["text"] for c in new_chunks]
-        
-        new_embeddings: NDArray[np.float32] = embedder.encode(
-            new_chunk_texts,
-            batch_size=64 if device == "cuda" else 32,
-            show_progress_bar=True,
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        ).astype("float32")  # type: ignore
-        
-        # Combine with existing (in same order as chunks)
-        print("[INFO] Merging with existing embeddings...")
-        # This is tricky - we need to reorder existing embeddings to match new chunk order
-        # Simpler approach: just regenerate all embeddings
-        print("[INFO] Regenerating all embeddings to ensure consistency...")
-        incremental = False  # Fall through to full regeneration
-    
     if not incremental or existing_embeddings is None:
-        # Generate all embeddings
         raw_chunks = [c["text"] for c in all_chunks]
-        print(f"[INFO] Generating embeddings for {len(raw_chunks)} chunks...")
+        
+        # 🔥 CRITICAL: Prepare texts for E5 models
+        prepared_texts = prepare_texts_for_embedding(raw_chunks, embed_model)
+        
+        if is_e5:
+            print(f"[INFO] ✓ E5 preprocessing applied: Added 'passage: ' to {len(prepared_texts)} chunks")
+            print(f"[INFO] Sample: '{prepared_texts[0][:80]}...'")
+        
+        print(f"[INFO] Generating embeddings for {len(prepared_texts)} chunks...")
         
         embeddings: NDArray[np.float32] = embedder.encode(
-            raw_chunks,
+            prepared_texts,  # 🔥 Use prepared texts, not raw_chunks!
             batch_size=64 if device == "cuda" else 32,
             show_progress_bar=True,
             convert_to_numpy=True,
@@ -576,6 +510,7 @@ def prepare_dataset(
     version_manager.version_data["total_chunks"] = len(all_chunks)
     version_manager.update_config({
         "embed_model": embed_model,
+        "is_e5_model": is_e5,
         "chunk_size": chunk_size,
         "use_sentence_chunking": use_sentence_chunking,
         "min_words": MIN_WORDS,
@@ -587,12 +522,13 @@ def prepare_dataset(
     print("PREPARATION COMPLETE!")
     print(f"{'='*60}")
     print(f"Version: {version_manager.version_data['version']}")
+    print(f"Model: {embed_model}")
+    if is_e5:
+        print(f"E5 Model: YES ✓")
     print(f"Files processed: {len(version_manager.version_data['processed_files'])}")
     print(f"Total chunks: {len(all_chunks)}")
-    print(f"Chunks after deduplication: {len(all_chunks)}")
     print()
 
 
 if __name__ == "__main__":
-    # Default preparation
     prepare_dataset()

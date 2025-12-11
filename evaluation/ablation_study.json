@@ -1,0 +1,86 @@
+{
+  "BGE-250": {
+    "retrieval": {
+      "precision@k": 0.15967741935483867,
+      "recall@k": 0.7983870967741935,
+      "mrr@k": 0.7435483870967741,
+      "num_queries": 124
+    },
+    "generation": {
+      "rouge1": 0.1620490397479513,
+      "rouge2": 0.03935504578924688,
+      "rougeL": 0.1314555683162795,
+      "num_examples": 10
+    }
+  },
+  "BGE-450": {
+    "retrieval": {
+      "precision@k": 0.15967741935483867,
+      "recall@k": 0.7983870967741935,
+      "mrr@k": 0.7435483870967741,
+      "num_queries": 124
+    },
+    "generation": {
+      "rouge1": 0.1620490397479513,
+      "rouge2": 0.03935504578924688,
+      "rougeL": 0.1314555683162795,
+      "num_examples": 10
+    }
+  },
+  "MiniLM-250": {
+    "retrieval": {
+      "precision@k": 0.15483870967741933,
+      "recall@k": 0.7741935483870968,
+      "mrr@k": 0.6870967741935484,
+      "num_queries": 124
+    },
+    "generation": {
+      "rouge1": 0.1692829867409226,
+      "rouge2": 0.0232508496356289,
+      "rougeL": 0.11097225303407705,
+      "num_examples": 10
+    }
+  },
+  "MiniLM-450": {
+    "retrieval": {
+      "precision@k": 0.15483870967741933,
+      "recall@k": 0.7741935483870968,
+      "mrr@k": 0.6870967741935484,
+      "num_queries": 124
+    },
+    "generation": {
+      "rouge1": 0.16353294446119998,
+      "rouge2": 0.0232508496356289,
+      "rougeL": 0.10522221075435441,
+      "num_examples": 10
+    }
+  },
+  "E5-Base-450": {
+    "retrieval": {
+      "precision@k": 0.1564516129032258,
+      "recall@k": 0.782258064516129,
+      "mrr@k": 0.7419354838709677,
+      "num_queries": 124
+    },
+    "generation": {
+      "rouge1": 0.2141669501093734,
+      "rouge2": 0.04221010406913519,
+      "rougeL": 0.1519930631471562,
+      "num_examples": 10
+    }
+  },
+  "E5-Base-250": {
+    "retrieval": {
+      "precision@k": 0.1564516129032258,
+      "recall@k": 0.782258064516129,
+      "mrr@k": 0.7419354838709677,
+      "num_queries": 124
+    },
+    "generation": {
+      "rouge1": 0.21995976194869682,
+      "rouge2": 0.04279411125691597,
+      "rougeL": 0.1544454944367968,
+      "num_examples": 10
+    }
+  }
+}
