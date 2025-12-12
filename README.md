@@ -195,7 +195,7 @@ python src/main.py --prepare --ablation
 
 ### **Papers indexed:** 20+
 
-### **Chunks created:** 2,847 (sentence-level, filtered)
+### **Chunks created:** 2,847 
 
 ### **Evaluation Q/A pairs:** 124
 
@@ -280,8 +280,4 @@ on Fairness and Bias in LLMs.
 
 ---
 
-## **📬 Contact**
-
-For any questions or issues:
-**Preeta Chatterjee & Harini Hari**
 
