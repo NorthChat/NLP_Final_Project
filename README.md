@@ -138,13 +138,9 @@ Outputs:
 python src/main.py --evaluate
 ```
 
+![Evaluation Results](evaluation/evaluation_results.png)
+
 ### **Human evaluation workflow:**
-
-This generates CSV templates & logs:
-
-```bash
-python src/evaluation.py --human
-```
 
 Human eval covers:
 
@@ -185,6 +181,8 @@ The project includes experiments comparing:
 | **E5-base**   | 768 | 0.156         | **0.154** |
 | MiniLM-L6     | 384 | 0.155         | 0.111     |
 
+![Ablation Comparison](evaluation/ablation_comparison.png)
+
 Run study:
 
 ```bash
@@ -200,14 +198,6 @@ python src/main.py --prepare --ablation
 ### **Chunks created:** 2,847 (sentence-level, filtered)
 
 ### **Evaluation Q/A pairs:** 124
-
-With categories such as:
-
-* Mitigation techniques
-* Bias evaluation methods
-* Fairness frameworks
-* LLM behavior & bias
-* Unlearning methods
 
 ---
 
@@ -294,3 +284,4 @@ on Fairness and Bias in LLMs.
 
 For any questions or issues:
 **Preeta Chatterjee & Harini Hari**
+
