@@ -155,6 +155,11 @@ Human eval covers:
 ```bash
 python src/main.py --ui
 ```
+Here are a few screens showing the UI - 
+
+![Interactive UI](evaluation/UI_1.png)
+
+![UI ](evaluation/UI_2.png)
 
 The interface supports:
 
@@ -279,5 +284,6 @@ on Fairness and Bias in LLMs.
 ```
 
 ---
+
 
 
